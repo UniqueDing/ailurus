@@ -1,0 +1,110 @@
+{
+  "appTitle": "Ailurus",
+  "settings": "Settings",
+  "caldav": "CalDAV",
+  "newEvent": "New",
+  "addDate": "Add date",
+  "birthday": "Birthday",
+  "anniversary": "Anniversary",
+  "gregorian": "Gregorian",
+  "lunar": "Lunar",
+  "closestDates": "Closest dates",
+  "today": "Today",
+  "next30Days": "Next 30 days",
+  "later": "Later",
+  "tomorrow": "Tomorrow",
+  "inDays": "In {days} days",
+  "@inDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "startHint": "Start with the dates that matter most.",
+  "addFirst": "Add your first date",
+  "editDate": "Edit item",
+  "createDate": "New item",
+  "saveChanges": "Save changes",
+  "identity": "Identity",
+  "dateSource": "Date source",
+  "reminders": "Reminders",
+  "name": "Name",
+  "title": "Title",
+  "notes": "Notes",
+  "month": "Month",
+  "day": "Day",
+  "yearOptional": "Year (optional)",
+  "unknown": "Unknown",
+  "preview": "Preview",
+  "nextOccurrence": "Next occurrence",
+  "happensToday": "Happens today",
+  "saveSyncSettings": "Save sync settings",
+  "serverUrl": "Server URL",
+  "username": "Username",
+  "password": "Password / App Password",
+  "calendarPath": "Calendar path",
+  "saveOk": "CalDAV settings saved.",
+  "currentConnection": "Current draft connection",
+  "noConfig": "No CalDAV endpoint configured yet.",
+  "syncedIds": "Synced IDs",
+  "lastSync": "Last sync",
+  "lastError": "Last error",
+  "noSyncYet": "No sync run yet.",
+  "syncIntro": "Fill in your CalDAV collection and run Sync now. Gregorian events sync as yearly VEVENT; lunar events sync as materialized upcoming instances.",
+  "passwordMemoryOnly": "For safety, password is only kept in memory for this app session.",
+  "unableLoadEvent": "Unable to load event: {error}",
+  "@unableLoadEvent": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "unableLoadDates": "Unable to load dates: {error}",
+  "@unableLoadDates": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "titleOrNameRequired": "Add at least a title or a name.",
+  "sameDayReminder": "Same-day reminder",
+  "oneDayBeforeReminder": "One day before",
+  "reminderThreeDays": "3 days before",
+  "reminderOneWeek": "1 week before",
+  "reminderConfigure": "Configure reminder timing",
+  "reminderSchedule": "Reminder schedule",
+  "birthdayNameRequired": "Name is required for birthdays.",
+  "gender": "Gender",
+  "relationship": "Relationship",
+  "ageYears": "Age {age}",
+  "@ageYears": {
+    "placeholders": {
+      "age": {
+        "type": "int"
+      }
+    }
+  },
+  "genderUnspecified": "Unspecified",
+  "genderMale": "Male",
+  "genderFemale": "Female",
+  "genderOther": "Other",
+  "relationshipFamily": "Family",
+  "relationshipPartner": "Partner",
+  "relationshipFriend": "Friend",
+  "relationshipColleague": "Colleague",
+  "relationshipClassmate": "Classmate",
+  "relationshipOther": "Other",
+  "eventMissing": "The event no longer exists.",
+  "invalidLunar": "Invalid lunar date. Please adjust day or month setting.",
+  "invalidLunarCombination": "Invalid lunar date combination. Please adjust the day or month selection.",
+  "delete": "Delete",
+  "language": "Language",
+  "syncNow": "Sync now",
+  "syncing": "Syncing...",
+  "syncStatus": "Sync status",
+  "leapMonth": "Leap month",
+  "languageChinese": "Chinese",
+  "languageEnglish": "English",
+  "languageJapanese": "Japanese",
+  "languageKorean": "Korean",
+  "heroSlogan": "A softer home for birthdays and anniversaries."
+}
