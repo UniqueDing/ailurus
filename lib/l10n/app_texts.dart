@@ -39,6 +39,7 @@ class AppTexts {
   static String reminders(BuildContext context) => _l10n(context).reminders;
   static String name(BuildContext context) => _l10n(context).name;
   static String title(BuildContext context) => _l10n(context).title;
+  static String details(BuildContext context) => _l10n(context).details;
   static String notes(BuildContext context) => _l10n(context).notes;
   static String month(BuildContext context) => _l10n(context).month;
   static String day(BuildContext context) => _l10n(context).day;
@@ -68,6 +69,10 @@ class AppTexts {
   static String syncIntro(BuildContext context) => _l10n(context).syncIntro;
   static String passwordMemoryOnly(BuildContext context) =>
       _l10n(context).passwordMemoryOnly;
+  static String allowInsecureTls(BuildContext context) =>
+      _l10n(context).allowInsecureTls;
+  static String allowInsecureTlsHint(BuildContext context) =>
+      _l10n(context).allowInsecureTlsHint;
   static String unableLoadEvent(BuildContext context, Object error) =>
       _l10n(context).unableLoadEvent('$error');
   static String unableLoadDates(BuildContext context, Object error) =>
@@ -88,6 +93,8 @@ class AppTexts {
       _l10n(context).reminderSchedule;
   static String birthdayNameRequired(BuildContext context) =>
       _l10n(context).birthdayNameRequired;
+  static String anniversaryTitleRequired(BuildContext context) =>
+      _l10n(context).anniversaryTitleRequired;
   static String gender(BuildContext context) => _l10n(context).gender;
   static String relationship(BuildContext context) =>
       _l10n(context).relationship;
@@ -104,8 +111,69 @@ class AppTexts {
   static String syncNow(BuildContext context) => _l10n(context).syncNow;
   static String syncing(BuildContext context) => _l10n(context).syncing;
   static String syncStatus(BuildContext context) => _l10n(context).syncStatus;
+  static String settingsOverview(BuildContext context) =>
+      _l10n(context).settingsOverview;
+  static String settingsOverviewHint(BuildContext context) =>
+      _l10n(context).settingsOverviewHint;
+  static String appearance(BuildContext context) => _l10n(context).appearance;
+  static String themeMode(BuildContext context) => _l10n(context).themeMode;
+  static String themeSystem(BuildContext context) => _l10n(context).themeSystem;
+  static String themeLight(BuildContext context) => _l10n(context).themeLight;
+  static String themeDark(BuildContext context) => _l10n(context).themeDark;
+  static String general(BuildContext context) => _l10n(context).general;
+  static String about(BuildContext context) => _l10n(context).about;
+  static String aboutApp(BuildContext context) => _l10n(context).aboutApp;
+  static String aboutAppDescription(BuildContext context) =>
+      _l10n(context).aboutAppDescription;
+  static String privacy(BuildContext context) => _l10n(context).privacy;
+  static String privacyPlaceholder(BuildContext context) =>
+      _l10n(context).privacyPlaceholder;
+  static String help(BuildContext context) => _l10n(context).help;
+  static String helpPlaceholder(BuildContext context) =>
+      _l10n(context).helpPlaceholder;
+  static String licenses(BuildContext context) => _l10n(context).licenses;
+  static String allTab(BuildContext context) => _l10n(context).allTab;
+  static String favoritesTab(BuildContext context) =>
+      _l10n(context).favoritesTab;
+  static String pinned(BuildContext context) => _l10n(context).pinned;
+  static String pin(BuildContext context) => _l10n(context).pin;
+  static String unpin(BuildContext context) => _l10n(context).unpin;
+  static String favorite(BuildContext context) => _l10n(context).favorite;
+  static String unfavorite(BuildContext context) => _l10n(context).unfavorite;
+  static String search(BuildContext context) => _l10n(context).search;
+  static String searchHint(BuildContext context) => _l10n(context).searchHint;
+  static String noSearchResult(BuildContext context) =>
+      _l10n(context).noSearchResult;
   static String leapMonth(BuildContext context) => _l10n(context).leapMonth;
-  static String heroSlogan(BuildContext context) => _l10n(context).heroSlogan;
+  static String caldavPreview(BuildContext context) =>
+      _l10n(context).caldavPreview;
+  static String caldavPreviewHint(BuildContext context) =>
+      _l10n(context).caldavPreviewHint;
+  static String cardTab(BuildContext context) => _l10n(context).cardTab;
+  static String unsavedChangesTitle(BuildContext context) =>
+      _l10n(context).unsavedChangesTitle;
+  static String unsavedChangesMessage(BuildContext context) =>
+      _l10n(context).unsavedChangesMessage;
+  static String keepEditing(BuildContext context) => _l10n(context).keepEditing;
+  static String discardChanges(BuildContext context) =>
+      _l10n(context).discardChanges;
+
+  static List<String> heroSlogans(BuildContext context) {
+    return <String>[
+      _l10n(context).heroSlogan,
+      _l10n(context).heroSloganAlt1,
+      _l10n(context).heroSloganAlt2,
+      _l10n(context).heroSloganAlt3,
+    ];
+  }
+
+  static String heroSloganByIndex(BuildContext context, int index) {
+    final List<String> slogans = heroSlogans(context);
+    if (slogans.isEmpty) {
+      return '';
+    }
+    return slogans[index % slogans.length];
+  }
 
   static String languageName(BuildContext context, String code) {
     return switch (code) {

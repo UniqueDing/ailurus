@@ -3,13 +3,28 @@ import 'package:ailurus/features/settings/data/caldav_sync_service.dart';
 import 'package:ailurus/features/settings/data/sync_settings_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+enum AppThemeMode { system, light, dark }
+
+extension AppThemeModeCodec on AppThemeMode {
+  String get key => name;
+
+  static AppThemeMode fromKey(String? value) {
+    return AppThemeMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => AppThemeMode.system,
+    );
+  }
+}
+
 class SyncSettings {
   const SyncSettings({
     this.serverUrl = '',
     this.username = '',
     this.password = '',
     this.calendarPath = '',
+    this.allowInsecureTls = false,
     this.languageCode = 'zh',
+    this.themeMode = AppThemeMode.system,
     this.syncedEventIds = const <String>[],
     this.lastSyncAtIso,
     this.lastSyncError,
@@ -19,7 +34,9 @@ class SyncSettings {
   final String username;
   final String password;
   final String calendarPath;
+  final bool allowInsecureTls;
   final String languageCode;
+  final AppThemeMode themeMode;
   final List<String> syncedEventIds;
   final String? lastSyncAtIso;
   final String? lastSyncError;
@@ -29,7 +46,9 @@ class SyncSettings {
     String? username,
     String? password,
     String? calendarPath,
+    bool? allowInsecureTls,
     String? languageCode,
+    AppThemeMode? themeMode,
     List<String>? syncedEventIds,
     String? lastSyncAtIso,
     String? lastSyncError,
@@ -41,7 +60,9 @@ class SyncSettings {
       username: username ?? this.username,
       password: password ?? this.password,
       calendarPath: calendarPath ?? this.calendarPath,
+      allowInsecureTls: allowInsecureTls ?? this.allowInsecureTls,
       languageCode: languageCode ?? this.languageCode,
+      themeMode: themeMode ?? this.themeMode,
       syncedEventIds: syncedEventIds ?? this.syncedEventIds,
       lastSyncAtIso: clearLastSyncAtIso
           ? null
@@ -56,8 +77,11 @@ class SyncSettings {
     return <String, Object?>{
       'serverUrl': serverUrl,
       'username': username,
+      'password': password,
       'calendarPath': calendarPath,
+      'allowInsecureTls': allowInsecureTls,
       'languageCode': languageCode,
+      'themeMode': themeMode.key,
       'syncedEventIds': syncedEventIds,
       'lastSyncAtIso': lastSyncAtIso,
       'lastSyncError': lastSyncError,
@@ -74,13 +98,19 @@ class SyncSettings {
           ? value['serverUrl']! as String
           : '',
       username: value['username'] is String ? value['username']! as String : '',
-      password: '',
+      password: value['password'] is String ? value['password']! as String : '',
       calendarPath: value['calendarPath'] is String
           ? value['calendarPath']! as String
           : '',
+      allowInsecureTls: value['allowInsecureTls'] is bool
+          ? value['allowInsecureTls']! as bool
+          : false,
       languageCode: value['languageCode'] is String
           ? value['languageCode']! as String
           : 'zh',
+      themeMode: AppThemeModeCodec.fromKey(
+        value['themeMode'] is String ? value['themeMode']! as String : null,
+      ),
       syncedEventIds: value['syncedEventIds'] is List<Object?>
           ? (value['syncedEventIds']! as List<Object?>)
                 .whereType<String>()
@@ -146,14 +176,18 @@ class SyncSettingsNotifier extends Notifier<SyncUiState> {
     required String username,
     required String password,
     required String calendarPath,
+    required bool allowInsecureTls,
     String? languageCode,
+    AppThemeMode? themeMode,
   }) async {
     final SyncSettings updated = state.settings.copyWith(
       serverUrl: serverUrl,
       username: username,
       password: password,
       calendarPath: calendarPath,
+      allowInsecureTls: allowInsecureTls,
       languageCode: languageCode,
+      themeMode: themeMode,
       clearLastSyncError: true,
     );
     state = state.copyWith(
@@ -195,6 +229,12 @@ class SyncSettingsNotifier extends Notifier<SyncUiState> {
 
   Future<void> setLanguageCode(String code) async {
     final SyncSettings updated = state.settings.copyWith(languageCode: code);
+    state = state.copyWith(settings: updated, clearStatusMessage: true);
+    await ref.read(syncSettingsRepositoryProvider).save(updated);
+  }
+
+  Future<void> setThemeMode(AppThemeMode mode) async {
+    final SyncSettings updated = state.settings.copyWith(themeMode: mode);
     state = state.copyWith(settings: updated, clearStatusMessage: true);
     await ref.read(syncSettingsRepositoryProvider).save(updated);
   }

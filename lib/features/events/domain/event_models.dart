@@ -90,6 +90,8 @@ class EventRecord {
     required this.isLeapMonth,
     required this.timezone,
     required this.note,
+    this.isPinned = false,
+    this.isFavorite = false,
     required this.reminderPolicy,
     this.lunarLeapMonthPolicy = LunarLeapMonthPolicy.regularMonth,
     this.lunarMissingDayPolicy = LunarMissingDayPolicy.previousDay,
@@ -111,6 +113,8 @@ class EventRecord {
   final bool isLeapMonth;
   final String timezone;
   final String? note;
+  final bool isPinned;
+  final bool isFavorite;
   final ReminderPolicy reminderPolicy;
   final LunarLeapMonthPolicy lunarLeapMonthPolicy;
   final LunarMissingDayPolicy lunarMissingDayPolicy;
@@ -136,6 +140,8 @@ class EventRecord {
       'isLeapMonth': isLeapMonth,
       'timezone': timezone,
       'note': note,
+      'isPinned': isPinned,
+      'isFavorite': isFavorite,
       'reminderPolicy': reminderPolicy.toJson(),
       'lunarLeapMonthPolicy': lunarLeapMonthPolicy.name,
       'lunarMissingDayPolicy': lunarMissingDayPolicy.name,
@@ -211,6 +217,10 @@ class EventRecord {
           : false,
       timezone: timezone,
       note: _asString(value['note']),
+      isPinned: value['isPinned'] is bool ? value['isPinned']! as bool : false,
+      isFavorite: value['isFavorite'] is bool
+          ? value['isFavorite']! as bool
+          : false,
       reminderPolicy: ReminderPolicy.fromJson(value['reminderPolicy']),
       lunarLeapMonthPolicy: lunarLeapMonthPolicy,
       lunarMissingDayPolicy: lunarMissingDayPolicy,
@@ -295,6 +305,64 @@ class EventRecord {
       }
     }
     return null;
+  }
+
+  EventRecord copyWith({
+    String? id,
+    EventType? type,
+    String? title,
+    String? personName,
+    bool clearPersonName = false,
+    PersonGender? personGender,
+    bool clearPersonGender = false,
+    PersonRelationship? personRelationship,
+    bool clearPersonRelationship = false,
+    CalendarType? calendarType,
+    int? sourceYear,
+    bool clearSourceYear = false,
+    int? sourceMonth,
+    int? sourceDay,
+    bool? isLeapMonth,
+    String? timezone,
+    String? note,
+    bool clearNote = false,
+    bool? isPinned,
+    bool? isFavorite,
+    ReminderPolicy? reminderPolicy,
+    LunarLeapMonthPolicy? lunarLeapMonthPolicy,
+    LunarMissingDayPolicy? lunarMissingDayPolicy,
+    Feb29Policy? feb29Policy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return EventRecord(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      title: title ?? this.title,
+      personName: clearPersonName ? null : (personName ?? this.personName),
+      personGender: clearPersonGender
+          ? null
+          : (personGender ?? this.personGender),
+      personRelationship: clearPersonRelationship
+          ? null
+          : (personRelationship ?? this.personRelationship),
+      calendarType: calendarType ?? this.calendarType,
+      sourceYear: clearSourceYear ? null : (sourceYear ?? this.sourceYear),
+      sourceMonth: sourceMonth ?? this.sourceMonth,
+      sourceDay: sourceDay ?? this.sourceDay,
+      isLeapMonth: isLeapMonth ?? this.isLeapMonth,
+      timezone: timezone ?? this.timezone,
+      note: clearNote ? null : (note ?? this.note),
+      isPinned: isPinned ?? this.isPinned,
+      isFavorite: isFavorite ?? this.isFavorite,
+      reminderPolicy: reminderPolicy ?? this.reminderPolicy,
+      lunarLeapMonthPolicy: lunarLeapMonthPolicy ?? this.lunarLeapMonthPolicy,
+      lunarMissingDayPolicy:
+          lunarMissingDayPolicy ?? this.lunarMissingDayPolicy,
+      feb29Policy: feb29Policy ?? this.feb29Policy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }
 

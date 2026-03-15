@@ -44,325 +44,430 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
       LunarMissingDayPolicy.previousDay;
   Feb29Policy _feb29Policy = Feb29Policy.feb28;
   bool _initialized = false;
+  bool _isHydrating = false;
+  String? _initialSnapshotKey;
+  bool _allowExitWithoutPrompt = false;
+  bool _isSaving = false;
+  bool _isPinned = false;
+  bool _isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController.addListener(_onInputChanged);
+    _personController.addListener(_onInputChanged);
+    _noteController.addListener(_onInputChanged);
+  }
 
   @override
   void dispose() {
+    _titleController.removeListener(_onInputChanged);
+    _personController.removeListener(_onInputChanged);
+    _noteController.removeListener(_onInputChanged);
     _titleController.dispose();
     _personController.dispose();
     _noteController.dispose();
     super.dispose();
   }
 
+  void _onInputChanged() {
+    if (!_initialized || _isHydrating || !mounted) {
+      return;
+    }
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final bool isDark = theme.brightness == Brightness.dark;
     final AsyncValue<EventRecord?> existing = widget.isEditing
         ? ref.watch(eventByIdProvider(widget.eventId!))
         : const AsyncValue<EventRecord?>.data(null);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.isEditing
-              ? AppTexts.editDate(context)
-              : AppTexts.createDate(context),
-        ),
-      ),
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: <Color>[
-              AppTheme.cream,
-              AppTheme.cream,
-              AppTheme.sand.withValues(alpha: 0.6),
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+    return PopScope(
+      canPop: _allowExitWithoutPrompt,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop) {
+          return;
+        }
+        final bool discard = await _confirmDiscardChanges();
+        if (!context.mounted) {
+          return;
+        }
+        if (discard) {
+          _allowExitWithoutPrompt = true;
+          context.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.isEditing
+                ? AppTexts.editDate(context)
+                : AppTexts.createDate(context),
           ),
+          actions: <Widget>[
+            IconButton(
+              onPressed: () => setState(() => _isPinned = !_isPinned),
+              tooltip: _isPinned
+                  ? AppTexts.unpin(context)
+                  : AppTexts.pin(context),
+              icon: Icon(
+                _isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                color: _isPinned ? AppTheme.moss : null,
+              ),
+            ),
+            IconButton(
+              onPressed: () => setState(() => _isFavorite = !_isFavorite),
+              tooltip: _isFavorite
+                  ? AppTexts.unfavorite(context)
+                  : AppTexts.favorite(context),
+              icon: Icon(
+                _isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
+                color: _isFavorite ? AppTheme.copper : null,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Tooltip(
+                message: widget.isEditing
+                    ? AppTexts.saveChanges(context)
+                    : AppTexts.createDate(context),
+                child: FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    minimumSize: const Size(42, 40),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check_rounded, size: 20),
+                ),
+              ),
+            ),
+          ],
         ),
-        child: SafeArea(
-          child: existing.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (Object error, StackTrace stackTrace) =>
-                Center(child: Text(AppTexts.unableLoadEvent(context, error))),
-            data: (EventRecord? record) {
-              if (!_initialized) {
-                _hydrate(record);
-              }
-              final bool wide = MediaQuery.sizeOf(context).width >= 1100;
-              final bool showRuleOptions =
-                  (_calendarType == CalendarType.chineseLunar &&
-                      (_isLeapMonth || _sourceDay == 30)) ||
-                  (_calendarType == CalendarType.gregorian &&
-                      _sourceMonth == 2 &&
-                      _sourceDay == 29);
-              final bool showLeapMonthPolicy =
-                  _calendarType == CalendarType.chineseLunar && _isLeapMonth;
-              final bool showLunarMissingDayPolicy =
-                  _calendarType == CalendarType.chineseLunar &&
-                  _sourceDay == 30;
-              final bool showFeb29Policy =
-                  _calendarType == CalendarType.gregorian &&
-                  _sourceMonth == 2 &&
-                  _sourceDay == 29;
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? <Color>[
+                      const Color(0xFF161C1A),
+                      const Color(0xFF1D2723),
+                      const Color(0xFF161C1A),
+                    ]
+                  : <Color>[
+                      AppTheme.cream,
+                      AppTheme.cream,
+                      AppTheme.sand.withValues(alpha: 0.6),
+                    ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            child: existing.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (Object error, StackTrace stackTrace) =>
+                  Center(child: Text(AppTexts.unableLoadEvent(context, error))),
+              data: (EventRecord? record) {
+                if (!_initialized) {
+                  _hydrate(record);
+                }
+                final bool wide = MediaQuery.sizeOf(context).width >= 1100;
+                final bool showRuleOptions =
+                    (_calendarType == CalendarType.chineseLunar &&
+                        (_isLeapMonth || _sourceDay == 30)) ||
+                    (_calendarType == CalendarType.gregorian &&
+                        _sourceMonth == 2 &&
+                        _sourceDay == 29);
+                final bool showLeapMonthPolicy =
+                    _calendarType == CalendarType.chineseLunar && _isLeapMonth;
+                final bool showLunarMissingDayPolicy =
+                    _calendarType == CalendarType.chineseLunar &&
+                    _sourceDay == 30;
+                final bool showFeb29Policy =
+                    _calendarType == CalendarType.gregorian &&
+                    _sourceMonth == 2 &&
+                    _sourceDay == 29;
 
-              final Widget form = Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                  children: <Widget>[
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              AppTexts.identity(context),
-                              style: theme.textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: 16),
-                            SegmentedButton<EventType>(
-                              segments: EventType.values
-                                  .map(
-                                    (value) => ButtonSegment<EventType>(
-                                      value: value,
-                                      label: Text(
-                                        value == EventType.birthday
-                                            ? AppTexts.birthday(context)
-                                            : AppTexts.anniversary(context),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              selected: <EventType>{_type},
-                              onSelectionChanged: (Set<EventType> values) =>
-                                  setState(() => _type = values.first),
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _personController,
-                              decoration: InputDecoration(
-                                labelText: AppTexts.name(context),
+                final Widget form = Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                    children: <Widget>[
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                AppTexts.identity(context),
+                                style: theme.textTheme.headlineMedium,
                               ),
-                              validator: (String? value) {
-                                if (_type == EventType.birthday &&
-                                    (value ?? '').trim().isEmpty) {
-                                  return AppTexts.birthdayNameRequired(context);
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            if (_type == EventType.anniversary)
-                              TextFormField(
-                                controller: _titleController,
-                                decoration: InputDecoration(
-                                  labelText: AppTexts.title(context),
-                                ),
-                                validator: (String? value) {
-                                  if ((value ?? '').trim().isEmpty &&
-                                      _personController.text.trim().isEmpty) {
-                                    return AppTexts.titleOrNameRequired(
-                                      context,
-                                    );
-                                  }
-                                  return null;
-                                },
-                              ),
-                            if (_type == EventType.birthday) ...<Widget>[
-                              DropdownField<PersonGender>(
-                                label: AppTexts.gender(context),
-                                value: _personGender,
-                                items: PersonGender.values
+                              const SizedBox(height: 16),
+                              SegmentedButton<EventType>(
+                                segments: EventType.values
                                     .map(
-                                      (value) => DropdownMenuItem<PersonGender>(
+                                      (value) => ButtonSegment<EventType>(
                                         value: value,
-                                        child: Text(
-                                          AppTexts.personGender(context, value),
+                                        label: Text(
+                                          value == EventType.birthday
+                                              ? AppTexts.birthday(context)
+                                              : AppTexts.anniversary(context),
                                         ),
                                       ),
                                     )
-                                    .toList(growable: false),
-                                onChanged: (PersonGender? value) {
-                                  if (value != null) {
-                                    setState(() => _personGender = value);
-                                  }
-                                },
+                                    .toList(),
+                                selected: <EventType>{_type},
+                                onSelectionChanged: (Set<EventType> values) =>
+                                    setState(() => _type = values.first),
                               ),
-                              const SizedBox(height: 12),
-                              DropdownField<PersonRelationship>(
-                                label: AppTexts.relationship(context),
-                                value: _personRelationship,
-                                items: PersonRelationship.values
-                                    .map(
-                                      (value) =>
-                                          DropdownMenuItem<PersonRelationship>(
-                                            value: value,
-                                            child: Text(
-                                              AppTexts.personRelationship(
-                                                context,
-                                                value,
+                              const SizedBox(height: 16),
+                              if (_type == EventType.birthday)
+                                TextFormField(
+                                  controller: _personController,
+                                  decoration: InputDecoration(
+                                    labelText: AppTexts.name(context),
+                                  ),
+                                  validator: (String? value) {
+                                    if ((value ?? '').trim().isEmpty) {
+                                      return AppTexts.birthdayNameRequired(
+                                        context,
+                                      );
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              if (_type == EventType.birthday)
+                                const SizedBox(height: 12),
+                              if (_type == EventType.anniversary)
+                                TextFormField(
+                                  controller: _titleController,
+                                  decoration: InputDecoration(
+                                    labelText: AppTexts.title(context),
+                                  ),
+                                  validator: (String? value) {
+                                    if ((value ?? '').trim().isEmpty) {
+                                      return AppTexts.anniversaryTitleRequired(
+                                        context,
+                                      );
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              if (_type == EventType.anniversary) ...<Widget>[
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _noteController,
+                                  maxLines: 4,
+                                  decoration: InputDecoration(
+                                    labelText: AppTexts.notes(context),
+                                  ),
+                                ),
+                              ],
+                              if (_type == EventType.birthday) ...<Widget>[
+                                const SizedBox(height: 12),
+                                DropdownField<PersonGender>(
+                                  label: AppTexts.gender(context),
+                                  value: _personGender,
+                                  items: PersonGender.values
+                                      .map(
+                                        (value) =>
+                                            DropdownMenuItem<PersonGender>(
+                                              value: value,
+                                              child: Text(
+                                                AppTexts.personGender(
+                                                  context,
+                                                  value,
+                                                ),
                                               ),
                                             ),
-                                          ),
+                                      )
+                                      .toList(growable: false),
+                                  onChanged: (PersonGender? value) {
+                                    if (value != null) {
+                                      setState(() => _personGender = value);
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownField<PersonRelationship>(
+                                  label: AppTexts.relationship(context),
+                                  value: _personRelationship,
+                                  items: PersonRelationship.values
+                                      .map(
+                                        (value) =>
+                                            DropdownMenuItem<
+                                              PersonRelationship
+                                            >(
+                                              value: value,
+                                              child: Text(
+                                                AppTexts.personRelationship(
+                                                  context,
+                                                  value,
+                                                ),
+                                              ),
+                                            ),
+                                      )
+                                      .toList(growable: false),
+                                  onChanged: (PersonRelationship? value) {
+                                    if (value != null) {
+                                      setState(
+                                        () => _personRelationship = value,
+                                      );
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _noteController,
+                                  maxLines: 4,
+                                  decoration: InputDecoration(
+                                    labelText: AppTexts.notes(context),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                AppTexts.dateSource(context),
+                                style: theme.textTheme.headlineMedium,
+                              ),
+                              const SizedBox(height: 16),
+                              SegmentedButton<CalendarType>(
+                                segments: CalendarType.values
+                                    .map(
+                                      (value) => ButtonSegment<CalendarType>(
+                                        value: value,
+                                        label: Text(
+                                          value == CalendarType.gregorian
+                                              ? AppTexts.gregorian(context)
+                                              : AppTexts.lunar(context),
+                                        ),
+                                      ),
                                     )
-                                    .toList(growable: false),
-                                onChanged: (PersonRelationship? value) {
-                                  if (value != null) {
-                                    setState(() => _personRelationship = value);
+                                    .toList(),
+                                selected: <CalendarType>{_calendarType},
+                                onSelectionChanged: (Set<CalendarType> values) {
+                                  final CalendarType target = values.first;
+                                  if (target == _calendarType) {
+                                    return;
                                   }
+                                  setState(() {
+                                    _switchCalendarType(target);
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              DateSelectors(
+                                calendarType: _calendarType,
+                                sourceYear: _sourceYear,
+                                sourceMonth: _sourceMonth,
+                                sourceDay: _sourceDay,
+                                isLeapMonth: _isLeapMonth,
+                                onYearChanged: (int? value) => setState(() {
+                                  _sourceYear = value;
+                                  _normalizeLunarSelection();
+                                }),
+                                onMonthChanged: (int value) => setState(() {
+                                  _sourceMonth = value.abs();
+                                  _isLeapMonth = value < 0;
+                                  _normalizeLunarSelection();
+                                }),
+                                onDayChanged: (int value) =>
+                                    setState(() => _sourceDay = value),
+                              ),
+                              if (showRuleOptions) ...<Widget>[
+                                const SizedBox(height: 16),
+                                PolicySelectors(
+                                  calendarType: _calendarType,
+                                  showLeapMonthPolicy: showLeapMonthPolicy,
+                                  showLunarMissingDayPolicy:
+                                      showLunarMissingDayPolicy,
+                                  showFeb29Policy: showFeb29Policy,
+                                  lunarLeapMonthPolicy: _lunarLeapMonthPolicy,
+                                  lunarMissingDayPolicy: _lunarMissingDayPolicy,
+                                  feb29Policy: _feb29Policy,
+                                  onLunarLeapMonthPolicyChanged:
+                                      (LunarLeapMonthPolicy value) => setState(
+                                        () => _lunarLeapMonthPolicy = value,
+                                      ),
+                                  onLunarMissingDayPolicyChanged:
+                                      (LunarMissingDayPolicy value) => setState(
+                                        () => _lunarMissingDayPolicy = value,
+                                      ),
+                                  onFeb29PolicyChanged: (Feb29Policy value) =>
+                                      setState(() => _feb29Policy = value),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                AppTexts.reminders(context),
+                                style: theme.textTheme.headlineMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              ReminderSelector(
+                                selectedOffsets: _reminderOffsets,
+                                onChanged: (Set<int> offsets) {
+                                  setState(() => _reminderOffsets = offsets);
                                 },
                               ),
                             ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Card(
+                      const SizedBox(height: 16),
+                      if (!wide) PreviewCard(record: _draftRecord(record)),
+                    ],
+                  ),
+                );
+                if (!wide) {
+                  return form;
+                }
+
+                return Row(
+                  children: <Widget>[
+                    Expanded(flex: 7, child: form),
+                    Expanded(
+                      flex: 4,
                       child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              AppTexts.dateSource(context),
-                              style: theme.textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: 16),
-                            SegmentedButton<CalendarType>(
-                              segments: CalendarType.values
-                                  .map(
-                                    (value) => ButtonSegment<CalendarType>(
-                                      value: value,
-                                      label: Text(
-                                        value == CalendarType.gregorian
-                                            ? AppTexts.gregorian(context)
-                                            : AppTexts.lunar(context),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              selected: <CalendarType>{_calendarType},
-                              onSelectionChanged: (Set<CalendarType> values) {
-                                final CalendarType target = values.first;
-                                if (target == _calendarType) {
-                                  return;
-                                }
-                                setState(() {
-                                  _switchCalendarType(target);
-                                });
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            DateSelectors(
-                              calendarType: _calendarType,
-                              sourceYear: _sourceYear,
-                              sourceMonth: _sourceMonth,
-                              sourceDay: _sourceDay,
-                              isLeapMonth: _isLeapMonth,
-                              onYearChanged: (int? value) => setState(() {
-                                _sourceYear = value;
-                                _normalizeLunarSelection();
-                              }),
-                              onMonthChanged: (int value) => setState(() {
-                                _sourceMonth = value.abs();
-                                _isLeapMonth = value < 0;
-                                _normalizeLunarSelection();
-                              }),
-                              onDayChanged: (int value) =>
-                                  setState(() => _sourceDay = value),
-                            ),
-                            if (showRuleOptions) ...<Widget>[
-                              const SizedBox(height: 16),
-                              PolicySelectors(
-                                calendarType: _calendarType,
-                                showLeapMonthPolicy: showLeapMonthPolicy,
-                                showLunarMissingDayPolicy:
-                                    showLunarMissingDayPolicy,
-                                showFeb29Policy: showFeb29Policy,
-                                lunarLeapMonthPolicy: _lunarLeapMonthPolicy,
-                                lunarMissingDayPolicy: _lunarMissingDayPolicy,
-                                feb29Policy: _feb29Policy,
-                                onLunarLeapMonthPolicyChanged:
-                                    (LunarLeapMonthPolicy value) => setState(
-                                      () => _lunarLeapMonthPolicy = value,
-                                    ),
-                                onLunarMissingDayPolicyChanged:
-                                    (LunarMissingDayPolicy value) => setState(
-                                      () => _lunarMissingDayPolicy = value,
-                                    ),
-                                onFeb29PolicyChanged: (Feb29Policy value) =>
-                                    setState(() => _feb29Policy = value),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              AppTexts.reminders(context),
-                              style: theme.textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: 12),
-                            ReminderSelector(
-                              selectedOffsets: _reminderOffsets,
-                              onChanged: (Set<int> offsets) {
-                                setState(() => _reminderOffsets = offsets);
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _noteController,
-                              maxLines: 4,
-                              decoration: InputDecoration(
-                                labelText: AppTexts.notes(context),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (!wide) PreviewCard(record: _draftRecord(record)),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: _save,
-                      icon: const Icon(Icons.check_rounded),
-                      label: Text(
-                        widget.isEditing
-                            ? AppTexts.saveChanges(context)
-                            : AppTexts.createDate(context),
+                        padding: const EdgeInsets.fromLTRB(0, 16, 20, 20),
+                        child: PreviewRail(record: _draftRecord(record)),
                       ),
                     ),
                   ],
-                ),
-              );
-              if (!wide) {
-                return form;
-              }
-
-              return Row(
-                children: <Widget>[
-                  Expanded(flex: 7, child: form),
-                  Expanded(
-                    flex: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 16, 20, 20),
-                      child: PreviewRail(record: _draftRecord(record)),
-                    ),
-                  ),
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -375,9 +480,11 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
       id: existing?.id ?? _randomId(),
       type: _type,
       title: _resolvedTitle(),
-      personName: _personController.text.trim().isEmpty
-          ? null
-          : _personController.text.trim(),
+      personName: _type == EventType.birthday
+          ? (_personController.text.trim().isEmpty
+                ? null
+                : _personController.text.trim())
+          : null,
       personGender: _type == EventType.birthday ? _personGender : null,
       personRelationship: _type == EventType.birthday
           ? _personRelationship
@@ -391,6 +498,8 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
       note: _noteController.text.trim().isEmpty
           ? null
           : _noteController.text.trim(),
+      isPinned: _isPinned,
+      isFavorite: _isFavorite,
       reminderPolicy: ReminderPolicy(offsetsInDays: _reminderOffsets.toList()),
       lunarLeapMonthPolicy: _lunarLeapMonthPolicy,
       lunarMissingDayPolicy: _lunarMissingDayPolicy,
@@ -401,11 +510,20 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
   }
 
   void _hydrate(EventRecord? record) {
+    _isHydrating = true;
     _initialized = true;
     if (record == null) {
+      _isPinned = false;
+      _isFavorite = false;
+      _initialSnapshotKey = _currentSnapshotKey();
+      _isHydrating = false;
       return;
     }
-    _titleController.text = record.title;
+    _titleController.text = record.type == EventType.anniversary
+        ? (record.title.trim().isNotEmpty
+              ? record.title
+              : (record.personName ?? ''))
+        : record.title;
     _personController.text = record.personName ?? '';
     _noteController.text = record.note ?? '';
     _type = record.type;
@@ -421,13 +539,24 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
     _lunarLeapMonthPolicy = record.lunarLeapMonthPolicy;
     _lunarMissingDayPolicy = record.lunarMissingDayPolicy;
     _feb29Policy = record.feb29Policy;
+    _isPinned = record.isPinned;
+    _isFavorite = record.isFavorite;
     _normalizeLunarSelection();
+    _initialSnapshotKey = _currentSnapshotKey();
+    _isHydrating = false;
   }
 
   Future<void> _save() async {
+    if (_isSaving) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    setState(() {
+      _isSaving = true;
+    });
 
     final EventRecord? existing = widget.isEditing
         ? await ref.read(eventByIdProvider(widget.eventId!).future)
@@ -454,22 +583,94 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
       return;
     }
 
-    await ref.read(eventRepositoryProvider).save(draft);
-    if (mounted) {
-      context.pop();
+    try {
+      await ref.read(eventRepositoryProvider).save(draft);
+      _initialSnapshotKey = _currentSnapshotKey();
+      _allowExitWithoutPrompt = true;
+      if (mounted) {
+        context.pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
+  bool get _hasUnsavedChanges {
+    final String? initial = _initialSnapshotKey;
+    if (initial == null) {
+      return false;
+    }
+    return initial != _currentSnapshotKey();
+  }
+
+  String _currentSnapshotKey() {
+    final List<int> sortedOffsets = _reminderOffsets.toList()..sort();
+    return <String>[
+      _type.name,
+      _calendarType.name,
+      '${_sourceYear ?? ''}',
+      '$_sourceMonth',
+      '$_sourceDay',
+      _isLeapMonth.toString(),
+      _titleController.text.trim(),
+      if (_type == EventType.birthday) _personController.text.trim(),
+      _noteController.text.trim(),
+      _isPinned.toString(),
+      _isFavorite.toString(),
+      _personGender.name,
+      _personRelationship.name,
+      _lunarLeapMonthPolicy.name,
+      _lunarMissingDayPolicy.name,
+      _feb29Policy.name,
+      sortedOffsets.join(','),
+    ].join('||');
+  }
+
+  Future<bool> _confirmDiscardChanges() async {
+    if (_allowExitWithoutPrompt || !_hasUnsavedChanges) {
+      return true;
+    }
+
+    final bool? discard = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(AppTexts.unsavedChangesTitle(context)),
+          content: Text(AppTexts.unsavedChangesMessage(context)),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(AppTexts.keepEditing(context)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(AppTexts.discardChanges(context)),
+            ),
+          ],
+        );
+      },
+    );
+
+    return discard == true;
+  }
+
   String _resolvedTitle() {
-    if (_type == EventType.birthday &&
-        _personController.text.trim().isNotEmpty) {
+    if (_type == EventType.anniversary) {
+      if (_titleController.text.trim().isNotEmpty) {
+        return _titleController.text.trim();
+      }
+      return _type.label;
+    }
+
+    if (_personController.text.trim().isNotEmpty) {
       return _personController.text.trim();
     }
     if (_titleController.text.trim().isNotEmpty) {
       return _titleController.text.trim();
-    }
-    if (_personController.text.trim().isNotEmpty) {
-      return _personController.text.trim();
     }
     return _type.label;
   }
