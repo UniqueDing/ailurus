@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: ["master"]
+    tags: ["v*"]
 
 jobs:
   build-desktop:
@@ -64,9 +65,11 @@ jobs:
           path: ${{ matrix.platform.artifact_path }}
           if-no-files-found: error
 
-  build-android:
-    name: Build android
+  build-android-release:
+    name: Build signed android apk
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: release
 
     steps:
       - name: Checkout
@@ -87,17 +90,43 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build Android APK
+      - name: Restore Android keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/release-keystore.jks
+
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=release-keystore.jks
+          EOF
+
+      - name: Build signed Android APK
         run: flutter build apk --release
 
-      - name: Build Android App Bundle
-        run: flutter build appbundle --release
+      - name: Verify APK signature
+        run: |
+          BUILD_TOOLS_VERSION=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Generate checksums
+        run: |
+          sha256sum build/app/outputs/flutter-apk/app-release.apk > build/app/outputs/flutter-apk/app-release.apk.sha256
+
+      - name: Export signing certificate details
+        run: |
+          BUILD_TOOLS_VERSION=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk \
+            > build/app/outputs/flutter-apk/app-release.cert.txt
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ailurus-android
+          name: ailurus-android-signed
           path: |
-            build/app/outputs/flutter-apk/*.apk
-            build/app/outputs/bundle/release/*.aab
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-release.apk.sha256
+            build/app/outputs/flutter-apk/app-release.cert.txt
           if-no-files-found: error

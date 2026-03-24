@@ -48,6 +48,8 @@ app.*.map.json
 /lib/generated/
 /android/.gradle/
 /android/local.properties
+/android/key.properties
+/android/release-keystore.jks
 /ios/Flutter/ephemeral/
 /macos/Flutter/ephemeral/
 /linux/flutter/ephemeral/
