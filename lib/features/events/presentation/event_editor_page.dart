@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import 'package:ailurus/app/theme/app_theme.dart';
 import 'package:ailurus/core/calendar/calendar_type.dart';
 import 'package:ailurus/features/events/application/providers.dart';
 import 'package:ailurus/features/events/domain/event_models.dart';
@@ -80,6 +79,7 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final ColorScheme colorScheme = theme.colorScheme;
     final bool isDark = theme.brightness == Brightness.dark;
     final AsyncValue<EventRecord?> existing = widget.isEditing
         ? ref.watch(eventByIdProvider(widget.eventId!))
@@ -115,7 +115,7 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
                   : AppTexts.pin(context),
               icon: Icon(
                 _isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                color: _isPinned ? AppTheme.moss : null,
+                color: _isPinned ? colorScheme.primary : null,
               ),
             ),
             IconButton(
@@ -125,9 +125,10 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
                   : AppTexts.favorite(context),
               icon: Icon(
                 _isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
-                color: _isFavorite ? AppTheme.copper : null,
+                color: _isFavorite ? colorScheme.secondary : null,
               ),
             ),
+            const SizedBox(width: 8),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: Tooltip(
@@ -138,18 +139,18 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
                   onPressed: _isSaving ? null : _save,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                    minimumSize: const Size(42, 40),
+                    minimumSize: const Size(56, 46),
                   ),
                   child: _isSaving
                       ? const SizedBox(
-                          width: 16,
-                          height: 16,
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.check_rounded, size: 20),
+                      : const Icon(Icons.check_rounded, size: 24),
                 ),
               ),
             ),
@@ -158,17 +159,11 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: isDark
-                  ? <Color>[
-                      const Color(0xFF161C1A),
-                      const Color(0xFF1D2723),
-                      const Color(0xFF161C1A),
-                    ]
-                  : <Color>[
-                      AppTheme.cream,
-                      AppTheme.cream,
-                      AppTheme.sand.withValues(alpha: 0.6),
-                    ],
+              colors: <Color>[
+                theme.scaffoldBackgroundColor,
+                colorScheme.surface,
+                colorScheme.secondary.withValues(alpha: isDark ? 0.12 : 0.08),
+              ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),

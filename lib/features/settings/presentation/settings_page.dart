@@ -1,3 +1,4 @@
+import 'package:ailurus/app/theme/app_theme.dart';
 import 'package:ailurus/features/settings/application/sync_settings_controller.dart';
 import 'package:ailurus/l10n/app_texts.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   late final TextEditingController _calendarController;
   late bool _allowInsecureTls;
   late AppThemeMode _themeMode;
+  late AppColorPalette _colorPalette;
   bool _hasLocalEdits = false;
   bool _isSyncingFromState = false;
 
@@ -30,6 +32,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _calendarController = TextEditingController(text: settings.calendarPath);
     _allowInsecureTls = settings.allowInsecureTls;
     _themeMode = settings.themeMode;
+    _colorPalette = settings.colorPalette;
     _serverController.addListener(_markLocalEdit);
     _userController.addListener(_markLocalEdit);
     _passwordController.addListener(_markLocalEdit);
@@ -63,6 +66,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
     _allowInsecureTls = settings.allowInsecureTls;
     _themeMode = settings.themeMode;
+    _colorPalette = settings.colorPalette;
     _isSyncingFromState = false;
   }
 
@@ -91,11 +95,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Text(
               AppTexts.settingsOverview(context),
               style: theme.textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              AppTexts.settingsOverviewHint(context),
-              style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
 
@@ -143,6 +142,44 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             .setThemeMode(next);
                       },
                     ),
+                    const SizedBox(height: 14),
+                    Text(
+                      AppTexts.colorPalette(context),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: DropdownButtonFormField<AppColorPalette>(
+                        initialValue: _colorPalette,
+                        isExpanded: true,
+                        menuMaxHeight: 320,
+                        borderRadius: BorderRadius.circular(18),
+                        items: AppColorPalette.values
+                            .map(
+                              (palette) => DropdownMenuItem<AppColorPalette>(
+                                value: palette,
+                                child: Text(
+                                  AppTexts.paletteName(context, palette),
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: (AppColorPalette? value) async {
+                          if (value == null) {
+                            return;
+                          }
+                          setState(() {
+                            _colorPalette = value;
+                          });
+                          await ref
+                              .read(syncSettingsProvider.notifier)
+                              .setColorPalette(value);
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -154,41 +191,50 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
                       AppTexts.language(context),
-                      style: theme.textTheme.titleMedium,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    DropdownButton<String>(
-                      value: settings.languageCode,
-                      items: <DropdownMenuItem<String>>[
-                        DropdownMenuItem<String>(
-                          value: 'zh',
-                          child: Text(AppTexts.languageName(context, 'zh')),
-                        ),
-                        DropdownMenuItem<String>(
-                          value: 'en',
-                          child: Text(AppTexts.languageName(context, 'en')),
-                        ),
-                        DropdownMenuItem<String>(
-                          value: 'ja',
-                          child: Text(AppTexts.languageName(context, 'ja')),
-                        ),
-                        DropdownMenuItem<String>(
-                          value: 'ko',
-                          child: Text(AppTexts.languageName(context, 'ko')),
-                        ),
-                      ],
-                      onChanged: (String? value) async {
-                        if (value == null) {
-                          return;
-                        }
-                        await ref
-                            .read(syncSettingsProvider.notifier)
-                            .setLanguageCode(value);
-                      },
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: settings.languageCode,
+                        isExpanded: true,
+                        menuMaxHeight: 320,
+                        borderRadius: BorderRadius.circular(18),
+                        items: const <DropdownMenuItem<String>>[
+                          DropdownMenuItem<String>(
+                            value: 'zh',
+                            child: Text('中文'),
+                          ),
+                          DropdownMenuItem<String>(
+                            value: 'en',
+                            child: Text('English'),
+                          ),
+                          DropdownMenuItem<String>(
+                            value: 'ja',
+                            child: Text('日本語'),
+                          ),
+                          DropdownMenuItem<String>(
+                            value: 'ko',
+                            child: Text('한국어'),
+                          ),
+                        ],
+                        onChanged: (String? value) async {
+                          if (value == null) {
+                            return;
+                          }
+                          await ref
+                              .read(syncSettingsProvider.notifier)
+                              .setLanguageCode(value);
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -244,55 +290,71 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         });
                       },
                     ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        AppTexts.passwordMemoryOnly(context),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _saveSettings,
-                        icon: const Icon(Icons.save_outlined),
-                        label: Text(AppTexts.saveSyncSettings(context)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: uiState.isSyncing
-                            ? null
-                            : () async {
-                                await ref
-                                    .read(syncSettingsProvider.notifier)
-                                    .syncNow();
-                              },
-                        icon: uiState.isSyncing
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.sync),
-                        label: Text(
-                          uiState.isSyncing
-                              ? AppTexts.syncing(context)
-                              : AppTexts.syncNow(context),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _saveSettings,
+                            icon: const Icon(Icons.save_outlined),
+                            label: Text(AppTexts.saveSyncSettings(context)),
+                          ),
                         ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: uiState.isSyncing
+                                ? null
+                                : () async {
+                                    await ref
+                                        .read(syncSettingsProvider.notifier)
+                                        .syncNow();
+                                  },
+                            icon: uiState.isSyncing
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.sync),
+                            label: Text(
+                              uiState.isSyncing
+                                  ? AppTexts.syncing(context)
+                                  : AppTexts.syncNow(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(AppTexts.currentConnection(context)),
+                      subtitle: Text(
+                        settings.serverUrl.isEmpty
+                            ? AppTexts.noConfig(context)
+                            : '${settings.serverUrl}\n${settings.username}\n${settings.calendarPath}\n${AppTexts.syncedIds(context)}: ${settings.syncedEventIds.length}',
+                      ),
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(AppTexts.syncStatus(context)),
+                      subtitle: Text(
+                        [
+                          if (settings.lastSyncAtIso != null)
+                            '${AppTexts.lastSync(context)}: ${settings.lastSyncAtIso}',
+                          if (settings.lastSyncError != null &&
+                              settings.lastSyncError!.isNotEmpty)
+                            '${AppTexts.lastError(context)}: ${settings.lastSyncError}',
+                          if (uiState.statusMessage != null)
+                            uiState.statusMessage!,
+                          if (settings.lastSyncAtIso == null &&
+                              uiState.statusMessage == null)
+                            AppTexts.noSyncYet(context),
+                        ].join('\n'),
                       ),
                     ),
                   ],
@@ -310,79 +372,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     leading: const Icon(Icons.info_outline_rounded),
                     title: Text(AppTexts.aboutApp(context)),
                     subtitle: const Text('Ailurus 1.0.0+1'),
-                    onTap: () {
-                      showAboutDialog(
-                        context: context,
-                        applicationName: 'Ailurus',
-                        applicationVersion: '1.0.0+1',
-                        children: <Widget>[
-                          Text(AppTexts.aboutAppDescription(context)),
-                        ],
-                      );
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.privacy_tip_outlined),
-                    title: Text(AppTexts.privacy(context)),
-                    onTap: () => _showInfoDialog(
-                      AppTexts.privacy(context),
-                      AppTexts.privacyPlaceholder(context),
+                    onTap: () => showDialog<void>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text('Ailurus 1.0.0+1'),
+                          content: Text(AppTexts.aboutAppDescription(context)),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: Text(
+                                MaterialLocalizations.of(context).okButtonLabel,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.help_outline_rounded),
-                    title: Text(AppTexts.help(context)),
-                    onTap: () => _showInfoDialog(
-                      AppTexts.help(context),
-                      AppTexts.helpPlaceholder(context),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.article_outlined),
-                    title: Text(AppTexts.licenses(context)),
-                    onTap: () {
-                      showLicensePage(
-                        context: context,
-                        applicationName: 'Ailurus',
-                        applicationVersion: '1.0.0+1',
-                      );
-                    },
                   ),
                 ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-            Card(
-              child: ListTile(
-                title: Text(AppTexts.currentConnection(context)),
-                subtitle: Text(
-                  settings.serverUrl.isEmpty
-                      ? AppTexts.noConfig(context)
-                      : '${settings.serverUrl}\n${settings.username}\n${settings.calendarPath}\n${AppTexts.syncedIds(context)}: ${settings.syncedEventIds.length}',
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Card(
-              child: ListTile(
-                title: Text(AppTexts.syncStatus(context)),
-                subtitle: Text(
-                  [
-                    if (settings.lastSyncAtIso != null)
-                      '${AppTexts.lastSync(context)}: ${settings.lastSyncAtIso}',
-                    if (settings.lastSyncError != null &&
-                        settings.lastSyncError!.isNotEmpty)
-                      '${AppTexts.lastError(context)}: ${settings.lastSyncError}',
-                    if (uiState.statusMessage != null) uiState.statusMessage!,
-                    if (settings.lastSyncAtIso == null &&
-                        uiState.statusMessage == null)
-                      AppTexts.noSyncYet(context),
-                  ].join('\n'),
-                ),
               ),
             ),
           ],
@@ -397,10 +405,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         .save(
           serverUrl: _serverController.text.trim(),
           username: _userController.text.trim(),
-          password: _passwordController.text,
+          password: _passwordController.text.trimRight(),
           calendarPath: _calendarController.text.trim(),
           allowInsecureTls: _allowInsecureTls,
           themeMode: _themeMode,
+          colorPalette: _colorPalette,
         );
     _hasLocalEdits = false;
     if (!mounted) {
@@ -409,23 +418,5 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(AppTexts.saveOk(context))));
-  }
-
-  Future<void> _showInfoDialog(String title, String body) {
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(body),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(MaterialLocalizations.of(context).okButtonLabel),
-            ),
-          ],
-        );
-      },
-    );
   }
 }

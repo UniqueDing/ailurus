@@ -1,4 +1,6 @@
+import 'package:ailurus/app/theme/app_theme.dart';
 import 'package:ailurus/features/events/application/providers.dart';
+import 'package:ailurus/features/events/domain/event_models.dart';
 import 'package:ailurus/features/settings/data/caldav_sync_service.dart';
 import 'package:ailurus/features/settings/data/sync_settings_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +27,7 @@ class SyncSettings {
     this.allowInsecureTls = false,
     this.languageCode = 'zh',
     this.themeMode = AppThemeMode.system,
+    this.colorPalette = AppColorPalette.material,
     this.syncedEventIds = const <String>[],
     this.lastSyncAtIso,
     this.lastSyncError,
@@ -37,6 +40,7 @@ class SyncSettings {
   final bool allowInsecureTls;
   final String languageCode;
   final AppThemeMode themeMode;
+  final AppColorPalette colorPalette;
   final List<String> syncedEventIds;
   final String? lastSyncAtIso;
   final String? lastSyncError;
@@ -49,6 +53,7 @@ class SyncSettings {
     bool? allowInsecureTls,
     String? languageCode,
     AppThemeMode? themeMode,
+    AppColorPalette? colorPalette,
     List<String>? syncedEventIds,
     String? lastSyncAtIso,
     String? lastSyncError,
@@ -63,6 +68,7 @@ class SyncSettings {
       allowInsecureTls: allowInsecureTls ?? this.allowInsecureTls,
       languageCode: languageCode ?? this.languageCode,
       themeMode: themeMode ?? this.themeMode,
+      colorPalette: colorPalette ?? this.colorPalette,
       syncedEventIds: syncedEventIds ?? this.syncedEventIds,
       lastSyncAtIso: clearLastSyncAtIso
           ? null
@@ -82,6 +88,7 @@ class SyncSettings {
       'allowInsecureTls': allowInsecureTls,
       'languageCode': languageCode,
       'themeMode': themeMode.key,
+      'colorPalette': colorPalette.key,
       'syncedEventIds': syncedEventIds,
       'lastSyncAtIso': lastSyncAtIso,
       'lastSyncError': lastSyncError,
@@ -110,6 +117,11 @@ class SyncSettings {
           : 'zh',
       themeMode: AppThemeModeCodec.fromKey(
         value['themeMode'] is String ? value['themeMode']! as String : null,
+      ),
+      colorPalette: AppColorPaletteCodec.fromKey(
+        value['colorPalette'] is String
+            ? value['colorPalette']! as String
+            : null,
       ),
       syncedEventIds: value['syncedEventIds'] is List<Object?>
           ? (value['syncedEventIds']! as List<Object?>)
@@ -179,6 +191,7 @@ class SyncSettingsNotifier extends Notifier<SyncUiState> {
     required bool allowInsecureTls,
     String? languageCode,
     AppThemeMode? themeMode,
+    AppColorPalette? colorPalette,
   }) async {
     final SyncSettings updated = state.settings.copyWith(
       serverUrl: serverUrl,
@@ -188,12 +201,10 @@ class SyncSettingsNotifier extends Notifier<SyncUiState> {
       allowInsecureTls: allowInsecureTls,
       languageCode: languageCode,
       themeMode: themeMode,
+      colorPalette: colorPalette,
       clearLastSyncError: true,
     );
-    state = state.copyWith(
-      settings: updated,
-      statusMessage: _isZh(updated) ? '同步设置已保存。' : 'Sync settings saved.',
-    );
+    state = state.copyWith(settings: updated, clearStatusMessage: true);
     await ref.read(syncSettingsRepositoryProvider).save(updated);
   }
 
@@ -202,16 +213,24 @@ class SyncSettingsNotifier extends Notifier<SyncUiState> {
     state = state.copyWith(
       isSyncing: true,
       statusMessage: _isZh(settings)
-          ? '正在同步到 CalDAV...'
-          : 'Syncing to CalDAV...',
+          ? '正在与 CalDAV 双向同步...'
+          : 'Running two-way CalDAV sync...',
     );
+
+    final List<EventRecord> localEvents = await ref
+        .read(eventRepositoryProvider)
+        .all();
 
     final CaldavSyncResult result = await ref
         .read(caldavSyncServiceProvider)
-        .sync(
-          settings: settings,
-          localEvents: await ref.read(eventRepositoryProvider).all(),
-        );
+        .sync(settings: settings, localEvents: localEvents);
+
+    for (final EventRecord downloaded in result.downloadedEvents) {
+      await ref.read(eventRepositoryProvider).save(downloaded);
+    }
+    for (final EventRecord updated in result.updatedEvents) {
+      await ref.read(eventRepositoryProvider).save(updated);
+    }
 
     final SyncSettings nextSettings = settings.copyWith(
       syncedEventIds: result.syncedEventIds,
@@ -239,21 +258,41 @@ class SyncSettingsNotifier extends Notifier<SyncUiState> {
     await ref.read(syncSettingsRepositoryProvider).save(updated);
   }
 
+  Future<void> setColorPalette(AppColorPalette palette) async {
+    final SyncSettings updated = state.settings.copyWith(colorPalette: palette);
+    state = state.copyWith(settings: updated, clearStatusMessage: true);
+    await ref.read(syncSettingsRepositoryProvider).save(updated);
+  }
+
   bool _isZh(SyncSettings settings) {
     return settings.languageCode.toLowerCase().startsWith('zh');
   }
 
   String _syncSummary(SyncSettings settings, CaldavSyncResult result) {
+    final bool hasOps =
+        result.uploaded > 0 || result.downloaded > 0 || result.deleted > 0;
+    final String errorSummary = result.errors
+        .map((error) => error.trim())
+        .where((error) => error.isNotEmpty)
+        .join(' | ');
     if (_isZh(settings)) {
       if (result.errors.isEmpty) {
-        return '同步完成：上传 ${result.uploaded} 条，删除 ${result.deleted} 条。';
+        return '同步完成：上传 ${result.uploaded} 条，下载 ${result.downloaded} 条，删除 ${result.deleted} 条。';
       }
-      return '同步完成：上传 ${result.uploaded} 条，删除 ${result.deleted} 条，错误 ${result.errors.length} 条。';
+      if (!hasOps) {
+        return errorSummary.isEmpty ? '同步失败。' : '同步失败：$errorSummary';
+      }
+      return '同步完成：上传 ${result.uploaded} 条，下载 ${result.downloaded} 条，删除 ${result.deleted} 条，错误 ${result.errors.length} 条。';
     }
     if (result.errors.isEmpty) {
-      return 'Sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted.';
+      return 'Sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded, ${result.deleted} deleted.';
     }
-    return 'Sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted, ${result.errors.length} errors.';
+    if (!hasOps) {
+      return errorSummary.isEmpty
+          ? 'Sync failed.'
+          : 'Sync failed: $errorSummary';
+    }
+    return 'Sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded, ${result.deleted} deleted, ${result.errors.length} errors.';
   }
 }
 

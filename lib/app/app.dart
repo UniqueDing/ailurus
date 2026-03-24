@@ -13,6 +13,7 @@ class AilurusApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final SyncSettings settings = ref.watch(syncSettingsProvider).settings;
     final String languageCode = settings.languageCode;
+    final AppColorPalette palette = settings.colorPalette;
     final ThemeMode themeMode = switch (settings.themeMode) {
       AppThemeMode.system => ThemeMode.system,
       AppThemeMode.light => ThemeMode.light,
@@ -22,8 +23,8 @@ class AilurusApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Ailurus',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(palette),
+      darkTheme: AppTheme.dark(palette),
       themeMode: themeMode,
       routerConfig: appRouter,
       locale: Locale(languageCode),

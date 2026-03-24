@@ -1,4 +1,3 @@
-import 'package:ailurus/app/theme/app_theme.dart';
 import 'package:ailurus/core/calendar/calendar_type.dart';
 import 'package:ailurus/features/events/domain/event_models.dart';
 import 'package:ailurus/features/events/domain/occurrence_calculator.dart';
@@ -567,13 +566,15 @@ class _PreviewCardState extends State<PreviewCard> {
           occurrence.isToday
               ? AppTexts.happensToday(context)
               : AppTexts.inDays(context, occurrence.daysUntil),
-          style: theme.textTheme.bodyLarge?.copyWith(color: AppTheme.moss),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.primary,
+          ),
         ),
       ] else
         Text(
           AppTexts.invalidLunarCombination(context),
           style: theme.textTheme.bodyLarge?.copyWith(
-            color: Colors.red.shade700,
+            color: theme.colorScheme.error,
           ),
         ),
       if (reminderLabels.isNotEmpty) ...<Widget>[
@@ -675,13 +676,15 @@ class _PreviewCardState extends State<PreviewCard> {
             occurrence.isToday
                 ? AppTexts.happensToday(context)
                 : AppTexts.inDays(context, occurrence.daysUntil),
-            style: theme.textTheme.bodyLarge?.copyWith(color: AppTheme.moss),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
           ),
         ] else
           Text(
             AppTexts.invalidLunarCombination(context),
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: Colors.red.shade700,
+              color: theme.colorScheme.error,
             ),
           ),
       ],
@@ -890,11 +893,12 @@ class PreviewRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ColorScheme colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        gradient: const LinearGradient(
-          colors: <Color>[AppTheme.moss, AppTheme.copper],
+        gradient: LinearGradient(
+          colors: <Color>[colorScheme.primary, colorScheme.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

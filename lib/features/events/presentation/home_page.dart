@@ -1,9 +1,9 @@
 import 'dart:math';
 
-import 'package:ailurus/app/theme/app_theme.dart';
 import 'package:ailurus/core/calendar/calendar_type.dart';
 import 'package:ailurus/features/events/application/providers.dart';
 import 'package:ailurus/features/events/domain/event_models.dart';
+import 'package:ailurus/features/settings/application/sync_settings_controller.dart';
 import 'package:ailurus/l10n/app_texts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,8 +64,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     final AsyncValue<List<EventOccurrence>> occurrences = ref.watch(
       sortedOccurrencesProvider,
     );
+    final SyncUiState syncUiState = ref.watch(syncSettingsProvider);
     final bool wide = MediaQuery.sizeOf(context).width >= 980;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colorScheme = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -89,6 +92,65 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ),
           IconButton(
+            tooltip: AppTexts.syncNow(context),
+            onPressed: syncUiState.isSyncing
+                ? null
+                : () async {
+                    await ref.read(syncSettingsProvider.notifier).syncNow();
+                    if (!context.mounted) {
+                      return;
+                    }
+                    final SyncUiState latest = ref.read(syncSettingsProvider);
+                    final String message =
+                        latest.statusMessage ??
+                        (AppTexts.isZh(context) ? '同步已完成。' : 'Sync finished.');
+                    final bool hasError =
+                        latest.settings.lastSyncError?.isNotEmpty == true;
+                    final ScaffoldMessengerState messenger =
+                        ScaffoldMessenger.of(context);
+                    messenger.hideCurrentSnackBar();
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: <Widget>[
+                            Icon(
+                              hasError
+                                  ? Icons.error_outline_rounded
+                                  : Icons.check_circle_outline_rounded,
+                              size: 18,
+                              color: hasError
+                                  ? colorScheme.onErrorContainer
+                                  : colorScheme.onPrimaryContainer,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(message)),
+                          ],
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                        margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        backgroundColor: hasError
+                            ? colorScheme.errorContainer
+                            : colorScheme.primaryContainer,
+                        showCloseIcon: true,
+                        closeIconColor: hasError
+                            ? colorScheme.onErrorContainer
+                            : colorScheme.onPrimaryContainer,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  },
+            icon: syncUiState.isSyncing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_rounded),
+          ),
+          IconButton(
             onPressed: () => context.push('/settings'),
             icon: const Icon(Icons.tune_rounded),
           ),
@@ -100,78 +162,122 @@ class _HomePageState extends ConsumerState<HomePage> {
         child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isDark
-                ? <Color>[
-                    const Color(0xFF161C1A),
-                    const Color(0xFF1D2723),
-                    const Color(0xFF161C1A),
-                  ]
-                : <Color>[
-                    AppTheme.cream,
-                    AppTheme.sand.withValues(alpha: 0.7),
-                    Colors.white,
-                  ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 104),
-            child: wide
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Expanded(
-                        flex: 7,
-                        child: _EventsPanel(
-                          occurrences: occurrences,
-                          favoritesOnly: _favoritesOnly,
-                          onFavoritesOnlyChanged: (bool value) {
-                            setState(() {
-                              _favoritesOnly = value;
-                            });
-                          },
-                          searchQuery: _searchController.text,
+      body: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double width = constraints.maxWidth;
+          final double height = constraints.maxHeight;
+          final double blobSize = width * 0.56;
+          final double auraSize = (height * 0.42).clamp(180, 460).toDouble();
+
+          return Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: <Color>[
+                        theme.scaffoldBackgroundColor,
+                        colorScheme.surface,
+                        colorScheme.primary.withValues(
+                          alpha: isDark ? 0.14 : 0.08,
                         ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        flex: 5,
-                        child: _HeroPanel(
-                          dateLabel: _todayLabel(context),
-                          sloganIndex: _sloganIndex,
-                          compact: false,
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      _HeroPanel(
-                        dateLabel: _todayLabel(context),
-                        sloganIndex: _sloganIndex,
-                        compact: true,
-                      ),
-                      const SizedBox(height: 14),
-                      _EventsPanel(
-                        occurrences: occurrences,
-                        favoritesOnly: _favoritesOnly,
-                        onFavoritesOnlyChanged: (bool value) {
-                          setState(() {
-                            _favoritesOnly = value;
-                          });
-                        },
-                        searchQuery: _searchController.text,
-                      ),
-                    ],
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                   ),
-          ),
-        ),
+                ),
+              ),
+              Positioned(
+                right: -blobSize * 0.22,
+                top: -blobSize * 0.28,
+                child: IgnorePointer(
+                  child: Container(
+                    width: blobSize,
+                    height: blobSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colorScheme.primary.withValues(
+                        alpha: isDark ? 0.09 : 0.07,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: -auraSize * 0.44,
+                bottom: -auraSize * 0.34,
+                child: IgnorePointer(
+                  child: Container(
+                    width: auraSize,
+                    height: auraSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colorScheme.secondary.withValues(
+                        alpha: isDark ? 0.08 : 0.06,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 104),
+                  child: wide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Expanded(
+                              flex: 7,
+                              child: _EventsPanel(
+                                occurrences: occurrences,
+                                favoritesOnly: _favoritesOnly,
+                                onFavoritesOnlyChanged: (bool value) {
+                                  setState(() {
+                                    _favoritesOnly = value;
+                                  });
+                                },
+                                searchQuery: _searchController.text,
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              flex: 5,
+                              child: _HeroPanel(
+                                dateLabel: _todayLabel(context),
+                                sloganIndex: _sloganIndex,
+                                compact: false,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            _HeroPanel(
+                              dateLabel: _todayLabel(context),
+                              sloganIndex: _sloganIndex,
+                              compact: true,
+                            ),
+                            const SizedBox(height: 14),
+                            _EventsPanel(
+                              occurrences: occurrences,
+                              favoritesOnly: _favoritesOnly,
+                              onFavoritesOnlyChanged: (bool value) {
+                                setState(() {
+                                  _favoritesOnly = value;
+                                });
+                              },
+                              searchQuery: _searchController.text,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -198,6 +304,7 @@ class _EventsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final ColorScheme colorScheme = theme.colorScheme;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -250,26 +357,27 @@ class _EventsPanel extends StatelessWidget {
                       style: theme.textTheme.titleLarge,
                     ),
                     const SizedBox(width: 10),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(999),
-                      onTap: () => onFavoritesOnlyChanged(!favoritesOnly),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 5),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () => onFavoritesOnlyChanged(!favoritesOnly),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           curve: Curves.easeOut,
+                          constraints: const BoxConstraints(minHeight: 28),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
-                            vertical: 2,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
                             color: favoritesOnly
-                                ? AppTheme.moss.withValues(alpha: 0.18)
+                                ? colorScheme.primary.withValues(alpha: 0.18)
                                 : Colors.transparent,
                             border: Border.all(
                               color: favoritesOnly
-                                  ? AppTheme.moss.withValues(alpha: 0.52)
+                                  ? colorScheme.primary.withValues(alpha: 0.52)
                                   : theme.colorScheme.onSurface.withValues(
                                       alpha: 0.18,
                                     ),
@@ -280,11 +388,11 @@ class _EventsPanel extends StatelessWidget {
                             children: <Widget>[
                               Icon(
                                 favoritesOnly
-                                    ? Icons.star_rounded
-                                    : Icons.star_border_rounded,
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
                                 size: 16,
                                 color: favoritesOnly
-                                    ? AppTheme.moss
+                                    ? colorScheme.primary
                                     : theme.colorScheme.onSurface.withValues(
                                         alpha: 0.55,
                                       ),
@@ -294,7 +402,7 @@ class _EventsPanel extends StatelessWidget {
                                 AppTexts.favorite(context),
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: favoritesOnly
-                                      ? AppTheme.moss
+                                      ? colorScheme.primary
                                       : theme.colorScheme.onSurface.withValues(
                                           alpha: 0.55,
                                         ),
@@ -359,6 +467,7 @@ class _HeroPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final ColorScheme colorScheme = theme.colorScheme;
 
     final Widget dateBadge = Container(
       padding: EdgeInsets.symmetric(
@@ -366,7 +475,7 @@ class _HeroPanel extends StatelessWidget {
         vertical: compact ? 6 : 9,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
+        color: colorScheme.onPrimary.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -375,7 +484,7 @@ class _HeroPanel extends StatelessWidget {
             (compact
                     ? theme.textTheme.titleLarge
                     : theme.textTheme.headlineMedium)
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: colorScheme.onPrimary),
       ),
     );
 
@@ -386,9 +495,9 @@ class _HeroPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(compact ? 24 : 36),
         gradient: LinearGradient(
           colors: <Color>[
-            AppTheme.moss,
-            AppTheme.moss.withValues(alpha: 0.92),
-            AppTheme.copper,
+            colorScheme.primary,
+            colorScheme.primary.withValues(alpha: 0.9),
+            colorScheme.secondary,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -409,7 +518,7 @@ class _HeroPanel extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           )
                         : theme.textTheme.displayMedium)
-                    ?.copyWith(color: Colors.white),
+                    ?.copyWith(color: colorScheme.onPrimary),
           ),
         ],
       ),
@@ -454,6 +563,15 @@ class _EventCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final bool isDark = theme.brightness == Brightness.dark;
+    final ColorScheme colorScheme = theme.colorScheme;
+    final Color favoriteToneStrong = Color.alphaBlend(
+      colorScheme.primary.withValues(alpha: isDark ? 0.34 : 0.26),
+      const Color(0xFFD32F2F),
+    );
+    final Color favoriteToneSoft = Color.alphaBlend(
+      colorScheme.secondary.withValues(alpha: isDark ? 0.3 : 0.2),
+      const Color(0xFFEF5350),
+    );
     return GestureDetector(
       onLongPressStart: (LongPressStartDetails details) {
         _showActionsMenu(context, ref, details.globalPosition);
@@ -464,117 +582,161 @@ class _EventCard extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: () => context.push('/event/${item.record.id}'),
-        child: Ink(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withValues(
-              alpha: isDark ? 0.96 : 0.86,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: theme.colorScheme.onSurface.withValues(
-                alpha: isDark ? 0.14 : 0.05,
-              ),
-            ),
-          ),
-          child: LayoutBuilder(
-            builder: (BuildContext context, BoxConstraints constraints) {
-              final Widget icon = Container(
-                width: 56,
-                height: 56,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            clipBehavior: Clip.antiAlias,
+            children: <Widget>[
+              Ink(
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  color: item.record.type == EventType.birthday
-                      ? (isDark
-                            ? AppTheme.copper.withValues(alpha: 0.32)
-                            : AppTheme.blush.withValues(alpha: 0.78))
-                      : (isDark
-                            ? AppTheme.moss.withValues(alpha: 0.34)
-                            : AppTheme.sand.withValues(alpha: 0.85)),
-                ),
-                child: Icon(
-                  item.record.type == EventType.birthday
-                      ? Icons.cake_rounded
-                      : Icons.favorite_rounded,
-                  color: AppTheme.ink,
-                ),
-              );
-
-              final Widget main = Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      _titleWithAge(context),
-                      style: theme.textTheme.titleLarge,
+                  color: theme.colorScheme.surface.withValues(
+                    alpha: isDark ? 0.96 : 0.86,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: theme.colorScheme.onSurface.withValues(
+                      alpha: isDark ? 0.14 : 0.05,
                     ),
-                    if (_noteText.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 4),
-                      Text(
-                        _noteText,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.65,
+                  ),
+                ),
+                child: LayoutBuilder(
+                  builder: (BuildContext context, BoxConstraints constraints) {
+                    final Widget icon = Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        color: item.record.type == EventType.birthday
+                            ? (isDark
+                                  ? colorScheme.secondaryContainer.withValues(
+                                      alpha: 0.48,
+                                    )
+                                  : colorScheme.secondaryContainer.withValues(
+                                      alpha: 0.8,
+                                    ))
+                            : (isDark
+                                  ? colorScheme.primaryContainer.withValues(
+                                      alpha: 0.5,
+                                    )
+                                  : colorScheme.primaryContainer.withValues(
+                                      alpha: 0.82,
+                                    )),
+                      ),
+                      child: Icon(
+                        item.record.type == EventType.birthday
+                            ? Icons.cake_rounded
+                            : Icons.favorite_rounded,
+                        color: item.record.type == EventType.birthday
+                            ? colorScheme.onSecondaryContainer
+                            : colorScheme.onPrimaryContainer,
+                      ),
+                    );
+
+                    final Widget main = Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          _nameWidget(theme),
+                          if (_ageWidget(context, theme)
+                              case final Widget ageWidget) ...<Widget>[
+                            const SizedBox(height: 2),
+                            ageWidget,
+                          ],
+                          if (_noteText.isNotEmpty) ...<Widget>[
+                            const SizedBox(height: 4),
+                            Text(
+                              _noteText,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.65,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+
+                    final Widget right = Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: <Widget>[
+                        Text(
+                          _countdownLabel(context),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: colorScheme.primary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          DateFormat.MMMd(
+                            Localizations.localeOf(context).toString(),
+                          ).format(item.nextDate),
+                          style: theme.textTheme.bodyMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (_lunarNextDateText(context)
+                            case final String lunarText) ...<Widget>[
+                          const SizedBox(height: 2),
+                          Text(
+                            lunarText,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.62,
+                              ),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    );
+
+                    return Row(
+                      children: <Widget>[
+                        icon,
+                        const SizedBox(width: 16),
+                        main,
+                        const SizedBox(width: 10),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 120),
+                          child: right,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              if (item.record.isFavorite)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: ClipPath(
+                      clipper: _TopRightTriangleClipper(),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: <Color>[
+                              favoriteToneSoft,
+                              favoriteToneStrong,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
                         ),
                       ),
-                    ],
-                  ],
+                    ),
+                  ),
                 ),
-              );
-
-              final Widget right = Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: <Widget>[
-                  Text(
-                    _countdownLabel(context),
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: isDark ? theme.colorScheme.primary : AppTheme.moss,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    DateFormat.MMMd(
-                      Localizations.localeOf(context).toString(),
-                    ).format(item.nextDate),
-                    style: theme.textTheme.bodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (_lunarNextDateText(context)
-                      case final String lunarText) ...<Widget>[
-                    const SizedBox(height: 2),
-                    Text(
-                      lunarText,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.62,
-                        ),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              );
-
-              return Row(
-                children: <Widget>[
-                  icon,
-                  const SizedBox(width: 16),
-                  main,
-                  const SizedBox(width: 10),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 120),
-                    child: right,
-                  ),
-                ],
-              );
-            },
+            ],
           ),
         ),
       ),
@@ -663,12 +825,29 @@ class _EventCard extends ConsumerWidget {
     return ref.read(eventRepositoryProvider).save(updated);
   }
 
-  String _titleWithAge(BuildContext context) {
-    if (item.record.type == EventType.birthday &&
-        item.occurrenceNumber != null) {
-      return '${item.record.displayTitle} · ${AppTexts.ageYears(context, item.occurrenceNumber!)}';
+  Widget _nameWidget(ThemeData theme) {
+    return Text(
+      item.record.displayTitle,
+      style: theme.textTheme.titleLarge,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget? _ageWidget(BuildContext context, ThemeData theme) {
+    if (item.record.type != EventType.birthday ||
+        item.occurrenceNumber == null) {
+      return null;
     }
-    return item.record.displayTitle;
+    return Text(
+      AppTexts.ageYears(context, item.occurrenceNumber!),
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w800,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 
   String? _lunarNextDateText(BuildContext context) {
@@ -687,6 +866,22 @@ class _EventCard extends ConsumerWidget {
   }
 }
 
+class _TopRightTriangleClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, 0)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) {
+    return false;
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onAdd});
 
@@ -695,6 +890,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final ColorScheme colorScheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
@@ -704,13 +900,13 @@ class _EmptyState extends StatelessWidget {
             width: 76,
             height: 76,
             decoration: BoxDecoration(
-              color: AppTheme.blush.withValues(alpha: 0.72),
+              color: colorScheme.secondaryContainer.withValues(alpha: 0.75),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.auto_awesome_rounded,
               size: 36,
-              color: AppTheme.ink,
+              color: colorScheme.onSecondaryContainer,
             ),
           ),
           const SizedBox(height: 18),
