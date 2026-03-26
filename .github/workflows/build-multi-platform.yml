@@ -130,3 +130,13 @@ jobs:
             build/app/outputs/flutter-apk/app-release.apk.sha256
             build/app/outputs/flutter-apk/app-release.cert.txt
           if-no-files-found: error
+
+      - name: Upload Android release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            build/app/outputs/flutter-apk/app-release.apk \
+            build/app/outputs/flutter-apk/app-release.apk.sha256 \
+            build/app/outputs/flutter-apk/app-release.cert.txt \
+            --clobber
