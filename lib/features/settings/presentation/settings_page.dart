@@ -3,6 +3,7 @@ import 'package:ailurus/features/settings/application/sync_settings_controller.d
 import 'package:ailurus/l10n/app_texts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -19,6 +20,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   late bool _allowInsecureTls;
   late AppThemeMode _themeMode;
   late AppColorPalette _colorPalette;
+  String _appVersionLabel = 'Ailurus';
   bool _hasLocalEdits = false;
   bool _isSyncingFromState = false;
 
@@ -37,6 +39,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _userController.addListener(_markLocalEdit);
     _passwordController.addListener(_markLocalEdit);
     _calendarController.addListener(_markLocalEdit);
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    final String buildSuffix = packageInfo.buildNumber.isEmpty
+        ? ''
+        : '+${packageInfo.buildNumber}';
+    final String nextLabel =
+        '${packageInfo.appName} ${packageInfo.version}$buildSuffix';
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _appVersionLabel = nextLabel;
+    });
   }
 
   void _markLocalEdit() {
@@ -371,12 +389,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ListTile(
                     leading: const Icon(Icons.info_outline_rounded),
                     title: Text(AppTexts.aboutApp(context)),
-                    subtitle: const Text('Ailurus 1.0.0+1'),
+                    subtitle: Text(_appVersionLabel),
                     onTap: () => showDialog<void>(
                       context: context,
                       builder: (BuildContext context) {
                         return AlertDialog(
-                          title: const Text('Ailurus 1.0.0+1'),
+                          title: Text(_appVersionLabel),
                           content: Text(AppTexts.aboutAppDescription(context)),
                           actions: <Widget>[
                             TextButton(
