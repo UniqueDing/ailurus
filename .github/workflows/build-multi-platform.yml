@@ -115,12 +115,6 @@ jobs:
         run: |
           sha256sum build/app/outputs/flutter-apk/app-release.apk > build/app/outputs/flutter-apk/app-release.apk.sha256
 
-      - name: Export signing certificate details
-        run: |
-          BUILD_TOOLS_VERSION=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)
-          "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk \
-            > build/app/outputs/flutter-apk/app-release.cert.txt
-
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
@@ -128,7 +122,6 @@ jobs:
           path: |
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/flutter-apk/app-release.apk.sha256
-            build/app/outputs/flutter-apk/app-release.cert.txt
           if-no-files-found: error
 
       - name: Upload Android release assets
@@ -138,5 +131,4 @@ jobs:
           gh release upload "${GITHUB_REF_NAME}" \
             build/app/outputs/flutter-apk/app-release.apk \
             build/app/outputs/flutter-apk/app-release.apk.sha256 \
-            build/app/outputs/flutter-apk/app-release.cert.txt \
             --clobber
