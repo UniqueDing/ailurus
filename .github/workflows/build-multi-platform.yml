@@ -27,7 +27,7 @@ jobs:
             package_name: ailurus-windows-${{ github.ref_name }}.zip
           - name: macos
             os: macos-latest
-            build_command: flutter build macos --release --no-codesign
+            build_command: flutter build macos --release
             package_name: ailurus-macos-${{ github.ref_name }}.dmg
 
     steps:
