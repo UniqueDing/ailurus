@@ -20,15 +20,18 @@ jobs:
           - name: linux
             os: ubuntu-latest
             build_command: flutter build linux --release
-            package_name: ailurus-linux-${{ github.ref_name }}.AppImage
+            artifact_base: ailurus-linux
+            package_extension: AppImage
           - name: windows
             os: windows-latest
             build_command: flutter build windows --release
-            package_name: ailurus-windows-${{ github.ref_name }}.zip
+            artifact_base: ailurus-windows
+            package_extension: zip
           - name: macos
             os: macos-latest
             build_command: flutter build macos --release
-            package_name: ailurus-macos-${{ github.ref_name }}.dmg
+            artifact_base: ailurus-macos
+            package_extension: dmg
 
     steps:
       - name: Checkout
@@ -54,6 +57,13 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Resolve package name
+        id: package_meta
+        shell: bash
+        run: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | cut -d+ -f1)
+          echo "name=${{ matrix.platform.artifact_base }}-${APP_VERSION}.${{ matrix.platform.package_extension }}" >> "$GITHUB_OUTPUT"
 
       - name: Build desktop app
         run: ${{ matrix.platform.build_command }}
@@ -86,7 +96,7 @@ jobs:
           desktop-file-validate AppDir/ailurus.desktop
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
-          ARCH=x86_64 ./appimagetool.AppImage --appimage-extract-and-run AppDir "dist/${{ matrix.platform.package_name }}"
+          ARCH=x86_64 ./appimagetool.AppImage --appimage-extract-and-run AppDir "dist/${{ steps.package_meta.outputs.name }}"
 
       - name: Package Windows ZIP
         if: runner.os == 'Windows'
@@ -94,20 +104,20 @@ jobs:
         run: |
           if (Test-Path dist) { Remove-Item dist -Recurse -Force }
           New-Item -ItemType Directory -Path dist | Out-Null
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "dist/${{ matrix.platform.package_name }}"
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "dist/${{ steps.package_meta.outputs.name }}"
 
       - name: Package macOS DMG
         if: runner.os == 'macOS'
         run: |
           rm -rf dist
           mkdir -p dist
-          hdiutil create -volname "Ailurus" -srcfolder "build/macos/Build/Products/Release/ailurus.app" -ov -format UDZO "dist/${{ matrix.platform.package_name }}"
+          hdiutil create -volname "Ailurus" -srcfolder "build/macos/Build/Products/Release/ailurus.app" -ov -format UDZO "dist/${{ steps.package_meta.outputs.name }}"
 
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform.name }}-package
-          path: dist/${{ matrix.platform.package_name }}
+          path: dist/${{ steps.package_meta.outputs.name }}
           if-no-files-found: error
 
       - name: Upload desktop release asset
@@ -116,7 +126,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --generate-notes >/dev/null 2>&1 || true
-          gh release upload "${GITHUB_REF_NAME}" "dist/${{ matrix.platform.package_name }}" --clobber
+          gh release upload "${GITHUB_REF_NAME}" "dist/${{ steps.package_meta.outputs.name }}" --clobber
 
   build-android-release:
     name: Build signed android apk
