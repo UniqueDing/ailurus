@@ -11,23 +11,38 @@ on:
 
 jobs:
   build-desktop:
-    name: Build ${{ matrix.platform.name }}
+    name: Build ${{ matrix.platform.name }} (${{ matrix.platform.arch }})
     runs-on: ${{ matrix.platform.os }}
     strategy:
       fail-fast: false
       matrix:
         platform:
           - name: linux
+            arch: amd64
             os: ubuntu-latest
-            build_command: flutter build linux --release
+            build_command: flutter build linux --release --target-platform linux-x64
+            artifact_base: ailurus-linux
+            package_extension: AppImage
+          - name: linux
+            arch: arm64
+            os: ubuntu-24.04-arm
+            build_command: flutter build linux --release --target-platform linux-arm64
             artifact_base: ailurus-linux
             package_extension: AppImage
           - name: windows
+            arch: amd64
             os: windows-latest
             build_command: flutter build windows --release
             artifact_base: ailurus-windows
             package_extension: zip
           - name: macos
+            arch: amd64
+            os: macos-13
+            build_command: flutter build macos --release
+            artifact_base: ailurus-macos
+            package_extension: dmg
+          - name: macos
+            arch: arm64
             os: macos-latest
             build_command: flutter build macos --release
             artifact_base: ailurus-macos
@@ -63,7 +78,13 @@ jobs:
         shell: bash
         run: |
           APP_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | cut -d+ -f1)
-          echo "name=${{ matrix.platform.artifact_base }}-${APP_VERSION}.${{ matrix.platform.package_extension }}" >> "$GITHUB_OUTPUT"
+          echo "name=${{ matrix.platform.artifact_base }}-${APP_VERSION}-${{ matrix.platform.arch }}.${{ matrix.platform.package_extension }}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve package checksum name
+        id: package_hash_meta
+        shell: bash
+        run: |
+          echo "name=${{ steps.package_meta.outputs.name }}.sha256" >> "$GITHUB_OUTPUT"
 
       - name: Build desktop app
         run: ${{ matrix.platform.build_command }}
@@ -94,9 +115,16 @@ jobs:
           Terminal=false
           EOF
           desktop-file-validate AppDir/ailurus.desktop
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
+          if [ "${{ matrix.platform.arch }}" = "arm64" ]; then
+            APPIMAGE_TOOL_URL="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage"
+            APPIMAGE_ARCH="aarch64"
+          else
+            APPIMAGE_TOOL_URL="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+            APPIMAGE_ARCH="x86_64"
+          fi
+          wget -q "$APPIMAGE_TOOL_URL" -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
-          ARCH=x86_64 ./appimagetool.AppImage --appimage-extract-and-run AppDir "dist/${{ steps.package_meta.outputs.name }}"
+          ARCH="$APPIMAGE_ARCH" ./appimagetool.AppImage --appimage-extract-and-run AppDir "dist/${{ steps.package_meta.outputs.name }}"
 
       - name: Package Windows ZIP
         if: runner.os == 'Windows'
@@ -116,8 +144,20 @@ jobs:
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform.name }}-package
+          name: ${{ matrix.platform.name }}-${{ matrix.platform.arch }}-package
           path: dist/${{ steps.package_meta.outputs.name }}
+          if-no-files-found: error
+
+      - name: Generate desktop checksum
+        shell: bash
+        run: |
+          sha256sum "dist/${{ steps.package_meta.outputs.name }}" > "dist/${{ steps.package_hash_meta.outputs.name }}"
+
+      - name: Upload desktop checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.name }}-${{ matrix.platform.arch }}-package-sha256
+          path: dist/${{ steps.package_hash_meta.outputs.name }}
           if-no-files-found: error
 
       - name: Upload desktop release asset
@@ -127,7 +167,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --generate-notes >/dev/null 2>&1 || true
-          gh release upload "${GITHUB_REF_NAME}" "dist/${{ steps.package_meta.outputs.name }}" --clobber
+          gh release upload "${GITHUB_REF_NAME}" \
+            "dist/${{ steps.package_meta.outputs.name }}" \
+            "dist/${{ steps.package_hash_meta.outputs.name }}" \
+            --clobber
 
   build-android-release:
     name: Build signed android apk
@@ -154,6 +197,16 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Resolve Android package names
+        id: android_meta
+        shell: bash
+        run: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | cut -d+ -f1)
+          echo "apk_arm64=ailurus-android-${APP_VERSION}-arm64.apk" >> "$GITHUB_OUTPUT"
+          echo "apk_arm64_sha=ailurus-android-${APP_VERSION}-arm64.apk.sha256" >> "$GITHUB_OUTPUT"
+          echo "apk_amd64=ailurus-android-${APP_VERSION}-amd64.apk" >> "$GITHUB_OUTPUT"
+          echo "apk_amd64_sha=ailurus-android-${APP_VERSION}-amd64.apk.sha256" >> "$GITHUB_OUTPUT"
+
       - name: Restore Android keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/release-keystore.jks
@@ -167,25 +220,32 @@ jobs:
           storeFile=release-keystore.jks
           EOF
 
-      - name: Build signed Android APK
-        run: flutter build apk --release
+      - name: Build signed Android APKs
+        run: flutter build apk --release --target-platform android-arm64,android-x64 --split-per-abi
 
       - name: Verify APK signature
         run: |
           BUILD_TOOLS_VERSION=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)
-          "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-x86_64-release.apk
 
       - name: Generate checksums
+        shell: bash
         run: |
-          sha256sum build/app/outputs/flutter-apk/app-release.apk > build/app/outputs/flutter-apk/app-release.apk.sha256
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_arm64 }}"
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_amd64 }}"
+          sha256sum "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_arm64 }}" > "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_arm64_sha }}"
+          sha256sum "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_amd64 }}" > "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_amd64_sha }}"
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: ailurus-android-signed
           path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-release.apk.sha256
+            build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_arm64 }}
+            build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_arm64_sha }}
+            build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_amd64 }}
+            build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_amd64_sha }}
           if-no-files-found: error
 
       - name: Upload Android release assets
@@ -195,6 +255,8 @@ jobs:
         run: |
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --generate-notes >/dev/null 2>&1 || true
           gh release upload "${GITHUB_REF_NAME}" \
-            build/app/outputs/flutter-apk/app-release.apk \
-            build/app/outputs/flutter-apk/app-release.apk.sha256 \
+            "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_arm64 }}" \
+            "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_arm64_sha }}" \
+            "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_amd64 }}" \
+            "build/app/outputs/flutter-apk/${{ steps.android_meta.outputs.apk_amd64_sha }}" \
             --clobber
