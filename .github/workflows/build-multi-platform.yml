@@ -39,13 +39,13 @@ jobs:
             package_extension: zip
           - name: macos
             arch: amd64
-            os: macos-13
+            os: macos-15-intel
             build_command: flutter build macos --release
             artifact_base: ailurus-macos
             package_extension: dmg
           - name: macos
             arch: arm64
-            os: macos-latest
+            os: macos-15
             build_command: flutter build macos --release
             artifact_base: ailurus-macos
             package_extension: dmg
