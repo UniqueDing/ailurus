@@ -196,6 +196,7 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
 
                 final Widget form = Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
                     children: <Widget>[
@@ -224,15 +225,24 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
                                     )
                                     .toList(),
                                 selected: <EventType>{_type},
-                                onSelectionChanged: (Set<EventType> values) =>
-                                    setState(() => _type = values.first),
+                                onSelectionChanged: (Set<EventType> values) {
+                                  final EventType nextType = values.first;
+                                  if (nextType == _type) {
+                                    return;
+                                  }
+                                  setState(() => _type = nextType);
+                                  _formKey.currentState?.reset();
+                                },
                               ),
                               const SizedBox(height: 16),
                               if (_type == EventType.birthday)
                                 TextFormField(
+                                  key: const ValueKey<String>(
+                                    'birthday-name-field',
+                                  ),
                                   controller: _personController,
                                   decoration: InputDecoration(
-                                    labelText: AppTexts.name(context),
+                                    labelText: '${AppTexts.name(context)} *',
                                   ),
                                   validator: (String? value) {
                                     if ((value ?? '').trim().isEmpty) {
@@ -247,9 +257,12 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
                                 const SizedBox(height: 12),
                               if (_type == EventType.anniversary)
                                 TextFormField(
+                                  key: const ValueKey<String>(
+                                    'anniversary-title-field',
+                                  ),
                                   controller: _titleController,
                                   decoration: InputDecoration(
-                                    labelText: AppTexts.title(context),
+                                    labelText: '${AppTexts.title(context)} *',
                                   ),
                                   validator: (String? value) {
                                     if ((value ?? '').trim().isEmpty) {
