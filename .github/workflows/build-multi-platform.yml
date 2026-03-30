@@ -121,23 +121,23 @@ jobs:
           cp build/linux/${{ matrix.platform.bundle_dir }}/release/bundle/ailurus AppDir/usr/
           cp -r build/linux/${{ matrix.platform.bundle_dir }}/release/bundle/lib AppDir/usr/
           cp -r build/linux/${{ matrix.platform.bundle_dir }}/release/bundle/data AppDir/usr/
-          cp assets/icons/app_icon_source.png AppDir/ailurus.png
+          cp assets/icons/app_icon_source.png AppDir/io.github.uniqueding.ailurus.png
           cat > AppDir/AppRun <<'EOF'
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
           exec "$HERE/usr/ailurus" "$@"
           EOF
           chmod +x AppDir/AppRun
-          cat > AppDir/ailurus.desktop <<'EOF'
+          cat > AppDir/io.github.uniqueding.ailurus.desktop <<'EOF'
           [Desktop Entry]
           Type=Application
           Name=Ailurus
           Exec=ailurus
-          Icon=ailurus
+          Icon=io.github.uniqueding.ailurus
           Categories=Utility;
           Terminal=false
           EOF
-          desktop-file-validate AppDir/ailurus.desktop
+          desktop-file-validate AppDir/io.github.uniqueding.ailurus.desktop
           if [ "${{ matrix.platform.arch }}" = "arm64" ]; then
             APPIMAGE_TOOL_URL="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage"
             APPIMAGE_ARCH="aarch64"

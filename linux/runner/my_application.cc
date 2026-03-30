@@ -5,6 +5,8 @@
 #include <gdk/gdkx.h>
 #endif
 
+#include <glib.h>
+
 #include "flutter/generated_plugin_registrant.h"
 
 struct _MyApplication {
@@ -28,6 +30,9 @@ static void my_application_activate(GApplication* application) {
   gtk_window_set_title(window, "ailurus");
   gtk_window_set_titlebar(window, nullptr);
   gtk_window_set_decorated(window, TRUE);
+  gtk_window_set_icon_name(window, APPLICATION_ID);
+  gtk_window_set_default_icon_from_file(
+      "data/flutter_assets/assets/icons/app_icon_source.png", nullptr);
 
   gtk_window_set_default_size(window, 1280, 720);
 
