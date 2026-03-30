@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:ailurus/core/calendar/calendar_type.dart';
 import 'package:ailurus/features/events/domain/event_models.dart';
@@ -601,6 +602,8 @@ class CaldavSyncService {
           description: _description(event),
           categories: event.type.name,
           dtStamp: dtStamp,
+          lastModified: _formatUtcDateTime(event.updatedAt.toUtc()),
+          sequence: _sequenceForEvent(event),
           dtStartDate: _formatDate(start),
           rrule: 'FREQ=YEARLY',
           xMeta: <String, String>{
@@ -631,6 +634,8 @@ class CaldavSyncService {
             description: 'Invalid lunar configuration in source app.',
             categories: event.type.name,
             dtStamp: dtStamp,
+            lastModified: _formatUtcDateTime(event.updatedAt.toUtc()),
+            sequence: _sequenceForEvent(event),
             dtStartDate: _formatDate(now),
             xMeta: <String, String>{
               'X-AILURUS-EVENT-TYPE': event.type.name,
@@ -650,6 +655,8 @@ class CaldavSyncService {
             description: _description(event),
             categories: event.type.name,
             dtStamp: dtStamp,
+            lastModified: _formatUtcDateTime(event.updatedAt.toUtc()),
+            sequence: _sequenceForEvent(event),
             dtStartDate: _formatDate(date),
             xMeta: <String, String>{
               'X-AILURUS-EVENT-TYPE': event.type.name,
@@ -681,27 +688,33 @@ class CaldavSyncService {
     required String description,
     required String categories,
     required String dtStamp,
+    required String lastModified,
+    required int sequence,
     required String dtStartDate,
     String? rrule,
     Map<String, String> xMeta = const <String, String>{},
   }) {
-    final StringBuffer b = StringBuffer()
-      ..writeln('BEGIN:VEVENT')
-      ..writeln('UID:${_escapeText(uid)}')
-      ..writeln('DTSTAMP:$dtStamp')
-      ..writeln('DTSTART;VALUE=DATE:$dtStartDate')
-      ..writeln('SUMMARY:${_escapeText(summary)}')
-      ..writeln('DESCRIPTION:${_escapeText(description)}')
-      ..writeln('CATEGORIES:${_escapeText(categories)}');
+    final List<String> lines = <String>[
+      'BEGIN:VEVENT',
+      'UID:${_escapeText(uid)}',
+      'DTSTAMP:$dtStamp',
+      'LAST-MODIFIED:$lastModified',
+      'SEQUENCE:$sequence',
+      'DTSTART;VALUE=DATE:$dtStartDate',
+      'TRANSP:TRANSPARENT',
+      'SUMMARY:${_escapeText(summary)}',
+      'DESCRIPTION:${_escapeText(description)}',
+      'CATEGORIES:${_escapeText(categories)}',
+    ];
 
     if (rrule != null && rrule.isNotEmpty) {
-      b.writeln('RRULE:$rrule');
+      lines.add('RRULE:$rrule');
     }
     for (final MapEntry<String, String> entry in xMeta.entries) {
-      b.writeln('${entry.key}:${_escapeText(entry.value)}');
+      lines.add('${entry.key}:${_escapeText(entry.value)}');
     }
-    b.writeln('END:VEVENT');
-    return b.toString();
+    lines.add('END:VEVENT');
+    return _joinFoldedLines(lines);
   }
 
   DateTime _gregorianStart(EventRecord event) {
@@ -768,6 +781,69 @@ class CaldavSyncService {
     final String minute = date.minute.toString().padLeft(2, '0');
     final String second = date.second.toString().padLeft(2, '0');
     return '$year$month${day}T$hour$minute${second}Z';
+  }
+
+  int _sequenceForEvent(EventRecord event) {
+    final int seconds = event.updatedAt.toUtc().millisecondsSinceEpoch ~/ 1000;
+    if (seconds < 0) {
+      return 0;
+    }
+    const int maxSequence = 2147483647;
+    return seconds > maxSequence ? maxSequence : seconds;
+  }
+
+  String _joinFoldedLines(List<String> lines) {
+    final String foldedPayload = lines.map(_foldIcsLine).join('\r\n');
+    return '$foldedPayload\r\n';
+  }
+
+  String _foldIcsLine(String line) {
+    const int maxOctets = 75;
+    final Uint8List bytes = Uint8List.fromList(utf8.encode(line));
+    if (bytes.length <= maxOctets) {
+      return line;
+    }
+
+    final StringBuffer buffer = StringBuffer();
+    int start = 0;
+    bool firstSegment = true;
+
+    while (start < bytes.length) {
+      int end = start;
+      while (end < bytes.length && end - start < maxOctets) {
+        end++;
+      }
+
+      while (end > start) {
+        try {
+          final String segment = utf8.decode(bytes.sublist(start, end));
+          if (!firstSegment) {
+            buffer.write('\r\n ');
+          }
+          buffer.write(segment);
+          firstSegment = false;
+          start = end;
+          break;
+        } on FormatException {
+          end--;
+        }
+      }
+
+      if (end == start) {
+        final String segment = utf8.decode(
+          bytes.sublist(start, start + 1),
+          allowMalformed: true,
+        );
+        if (!firstSegment) {
+          buffer.write('\r\n ');
+        }
+        buffer.write(segment);
+        firstSegment = false;
+        start += 1;
+      }
+    }
+
+    return buffer.toString();
   }
 
   String _escapeText(String value) {

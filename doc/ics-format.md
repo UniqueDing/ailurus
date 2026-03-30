@@ -29,7 +29,10 @@ Ailurus 生成的 `VEVENT` 含以下标准字段：
 
 - `UID`
 - `DTSTAMP`
+- `LAST-MODIFIED`
+- `SEQUENCE`
 - `DTSTART;VALUE=DATE`
+- `TRANSP`（`TRANSPARENT`）
 - `SUMMARY`
 - `DESCRIPTION`
 - `CATEGORIES`
@@ -39,6 +42,24 @@ Ailurus 生成的 `VEVENT` 含以下标准字段：
 
 - `DTSTART` 为日期值（非时间）
 - `DTSTAMP` 为 UTC 时间戳（`yyyyMMddTHHmmssZ`）
+- `LAST-MODIFIED` 为事件最后修改时间（UTC）
+- `SEQUENCE` 为事件版本计数（随修改递增）
+- `TRANSP:TRANSPARENT` 用于表示该全天纪念日不占用忙闲状态
+
+## 2.1 行折叠（Line Folding）
+
+为提高跨客户端兼容性，Ailurus 在生成端按 RFC 约定对长行进行折叠：
+
+- 每行最长 75 octets
+- 超长部分续行时使用 `CRLF + 空格` 前缀
+- 解析端会进行 unfold（将续行还原）
+
+示例（概念化）：
+
+```ics
+DESCRIPTION:This is a long value ...
+ <continued content>
+```
 
 ## 3. Ailurus 扩展字段（X-）
 
@@ -114,7 +135,10 @@ CALSCALE:GREGORIAN
 BEGIN:VEVENT
 UID:ailurus-abc123@ailurus.app
 DTSTAMP:20260316T030000Z
+LAST-MODIFIED:20260316T030500Z
+SEQUENCE:1773630300
 DTSTART;VALUE=DATE:19900501
+TRANSP:TRANSPARENT
 SUMMARY:Alice - Birthday
 DESCRIPTION:From Ailurus
 CATEGORIES:birthday
