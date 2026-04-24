@@ -529,6 +529,12 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
     _isHydrating = true;
     _initialized = true;
     if (record == null) {
+      final DateTime today = DateTime.now();
+      _calendarType = CalendarType.gregorian;
+      _sourceYear = today.year;
+      _sourceMonth = today.month;
+      _sourceDay = today.day;
+      _isLeapMonth = false;
       _isPinned = false;
       _isFavorite = false;
       _reminderTime = '09:00';
