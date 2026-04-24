@@ -54,6 +54,8 @@
   "reminderThreeDays": "3日前に通知",
   "reminderOneWeek": "1週間前に通知",
   "reminderSchedule": "通知スケジュール",
+  "reminderTime": "通知時刻",
+  "invalidReminderTime": "HH:mm 形式の有効な時刻を入力してください。",
   "birthdayNameRequired": "誕生日には名前が必要です。",
   "anniversaryTitleRequired": "記念日にはタイトルが必要です。",
   "gender": "性別",

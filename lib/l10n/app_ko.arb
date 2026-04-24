@@ -54,6 +54,8 @@
   "reminderThreeDays": "3일 전 알림",
   "reminderOneWeek": "1주 전 알림",
   "reminderSchedule": "알림 일정",
+  "reminderTime": "알림 시간",
+  "invalidReminderTime": "HH:mm 형식의 올바른 시간을 입력하세요.",
   "birthdayNameRequired": "생일에는 이름이 필요합니다.",
   "anniversaryTitleRequired": "기념일에는 제목이 필요합니다.",
   "gender": "성별",

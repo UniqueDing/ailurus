@@ -71,6 +71,8 @@
   "reminderThreeDays": "3 days before",
   "reminderOneWeek": "1 week before",
   "reminderSchedule": "Reminder schedule",
+  "reminderTime": "Reminder time",
+  "invalidReminderTime": "Enter a valid time in HH:mm format.",
   "birthdayNameRequired": "Name is required for birthdays.",
   "anniversaryTitleRequired": "Title is required for anniversaries.",
   "gender": "Gender",

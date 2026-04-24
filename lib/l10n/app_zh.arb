@@ -54,6 +54,8 @@
   "reminderThreeDays": "提前3天",
   "reminderOneWeek": "提前1周",
   "reminderSchedule": "提醒计划",
+  "reminderTime": "提醒时间",
+  "invalidReminderTime": "请输入有效时间，格式为 HH:mm。",
   "birthdayNameRequired": "生日必须填写姓名。",
   "anniversaryTitleRequired": "纪念日必须填写标题。",
   "gender": "性别",

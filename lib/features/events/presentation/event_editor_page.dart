@@ -35,6 +35,7 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
   int _sourceDay = 1;
   bool _isLeapMonth = false;
   Set<int> _reminderOffsets = <int>{0};
+  String _reminderTime = '09:00';
   PersonGender _personGender = PersonGender.unspecified;
   PersonRelationship _personRelationship = PersonRelationship.family;
   LunarLeapMonthPolicy _lunarLeapMonthPolicy =
@@ -445,8 +446,12 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
                               const SizedBox(height: 12),
                               ReminderSelector(
                                 selectedOffsets: _reminderOffsets,
+                                selectedTime: _normalizedReminderTime(),
                                 onChanged: (Set<int> offsets) {
                                   setState(() => _reminderOffsets = offsets);
+                                },
+                                onTimeChanged: (String value) {
+                                  setState(() => _reminderTime = value);
                                 },
                               ),
                             ],
@@ -508,7 +513,10 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
           : _noteController.text.trim(),
       isPinned: _isPinned,
       isFavorite: _isFavorite,
-      reminderPolicy: ReminderPolicy(offsetsInDays: _reminderOffsets.toList()),
+      reminderPolicy: ReminderPolicy(
+        offsetsInDays: _reminderOffsets.toList(),
+        localTime: _normalizedReminderTime(),
+      ),
       lunarLeapMonthPolicy: _lunarLeapMonthPolicy,
       lunarMissingDayPolicy: _lunarMissingDayPolicy,
       feb29Policy: _feb29Policy,
@@ -523,6 +531,7 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
     if (record == null) {
       _isPinned = false;
       _isFavorite = false;
+      _reminderTime = '09:00';
       _initialSnapshotKey = _currentSnapshotKey();
       _isHydrating = false;
       return;
@@ -544,6 +553,7 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
     _sourceDay = record.sourceDay;
     _isLeapMonth = record.isLeapMonth;
     _reminderOffsets = record.reminderPolicy.offsetsInDays.toSet();
+    _reminderTime = record.reminderPolicy.localTime;
     _lunarLeapMonthPolicy = record.lunarLeapMonthPolicy;
     _lunarMissingDayPolicy = record.lunarMissingDayPolicy;
     _feb29Policy = record.feb29Policy;
@@ -635,7 +645,16 @@ class _EventEditorPageState extends ConsumerState<EventEditorPage> {
       _lunarMissingDayPolicy.name,
       _feb29Policy.name,
       sortedOffsets.join(','),
+      _normalizedReminderTime(),
     ].join('||');
+  }
+
+  String _normalizedReminderTime() {
+    final String raw = _reminderTime.trim();
+    if (raw.isEmpty) {
+      return '09:00';
+    }
+    return raw;
   }
 
   Future<bool> _confirmDiscardChanges() async {

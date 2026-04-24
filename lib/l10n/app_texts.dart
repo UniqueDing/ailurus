@@ -77,6 +77,10 @@ class AppTexts {
       _l10n(context).reminderOneWeek;
   static String reminderSchedule(BuildContext context) =>
       _l10n(context).reminderSchedule;
+  static String reminderTime(BuildContext context) =>
+      _l10n(context).reminderTime;
+  static String invalidReminderTime(BuildContext context) =>
+      _l10n(context).invalidReminderTime;
   static String birthdayNameRequired(BuildContext context) =>
       _l10n(context).birthdayNameRequired;
   static String anniversaryTitleRequired(BuildContext context) =>

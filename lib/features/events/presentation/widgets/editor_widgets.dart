@@ -157,11 +157,15 @@ class ReminderSelector extends StatelessWidget {
   const ReminderSelector({
     super.key,
     required this.selectedOffsets,
+    required this.selectedTime,
     required this.onChanged,
+    required this.onTimeChanged,
   });
 
   final Set<int> selectedOffsets;
+  final String selectedTime;
   final ValueChanged<Set<int>> onChanged;
+  final ValueChanged<String> onTimeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -203,8 +207,77 @@ class ReminderSelector extends StatelessWidget {
               )
               .toList(growable: false),
         ),
+        const SizedBox(height: 12),
+        FormField<String>(
+          initialValue: selectedTime,
+          builder: (FormFieldState<String> field) {
+            final TimeOfDay time = _parseTime(selectedTime);
+            final String displayTime = MaterialLocalizations.of(
+              context,
+            ).formatTimeOfDay(time, alwaysUse24HourFormat: true);
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () async {
+                final TimeOfDay? picked = await showTimePicker(
+                  context: context,
+                  initialTime: time,
+                  builder: (BuildContext context, Widget? child) {
+                    return MediaQuery(
+                      data: MediaQuery.of(context).copyWith(
+                        alwaysUse24HourFormat: true,
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked == null) {
+                  return;
+                }
+                final String next = _formatTime(picked);
+                onTimeChanged(next);
+                field.didChange(next);
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: AppTexts.reminderTime(context),
+                  errorText: field.errorText,
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        displayTime,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ),
+                    const Icon(Icons.schedule_rounded),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
       ],
     );
+  }
+
+  TimeOfDay _parseTime(String value) {
+    final RegExp pattern = RegExp(r'^(?:([01]\d|2[0-3])):([0-5]\d)$');
+    final Match? match = pattern.firstMatch(value.trim());
+    if (match == null) {
+      return const TimeOfDay(hour: 9, minute: 0);
+    }
+    return TimeOfDay(
+      hour: int.parse(match.group(1)!),
+      minute: int.parse(match.group(2)!),
+    );
+  }
+
+  String _formatTime(TimeOfDay time) {
+    final String hour = time.hour.toString().padLeft(2, '0');
+    final String minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 }
 
@@ -782,15 +855,20 @@ class _PreviewCardState extends State<PreviewCard> {
   List<String> _reminderLabels(BuildContext context, EventRecord record) {
     final List<int> offsets = record.reminderPolicy.offsetsInDays.toList()
       ..sort();
+    final String time = record.reminderPolicy.localTime.trim();
     return offsets
         .map((offset) {
-          return switch (offset) {
+          final String label = switch (offset) {
             0 => AppTexts.sameDayReminder(context),
             1 => AppTexts.oneDayBeforeReminder(context),
             3 => AppTexts.reminderThreeDays(context),
             7 => AppTexts.reminderOneWeek(context),
             _ => '$offset${AppTexts.isZh(context) ? ' 天前' : 'd before'}',
           };
+          if (time.isEmpty) {
+            return label;
+          }
+          return '$label · $time';
         })
         .toList(growable: false);
   }
